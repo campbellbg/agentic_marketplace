@@ -1,0 +1,9 @@
+{
+  "name": "agentic-builder",
+  "version": "1.0.0",
+  "description": "Agentic feature build loop: requirement review and decomposition, iterative build, parallel code/security/test reviews, consolidation, and git ship workflow.",
+  "author": {
+    "name": "Bryan"
+  },
+  "keywords": ["agentic", "build-loop", "code-review", "security-review", "testing", "git"]
+}

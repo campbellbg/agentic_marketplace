@@ -1,0 +1,18 @@
+{
+  "name": "bryan_agentic_marketplace",
+  "owner": {
+    "name": "Bryan"
+  },
+  "metadata": {
+    "description": "Private Claude Code plugin marketplace for agentic build workflows.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "agentic-builder",
+      "source": "./plugins/agentic-builder",
+      "description": "Agentic feature build loop: requirement review and decomposition, iterative build, parallel code/security/test reviews, consolidation, and git ship workflow.",
+      "version": "1.0.0"
+    }
+  ]
+}
