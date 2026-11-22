@@ -1,0 +1,78 @@
+# Production deploy (agentic-builder pattern app-serving).
+# Runs on every push to the base branch (i.e. every merged PR) and only there.
+# Keep the structure; adapt only the build steps, BUILD_DIR and
+# HASHED_ASSETS_DIR. Pin actions to commit SHAs.
+name: Deploy production
+
+on:
+  push:
+    branches: [<base-branch>]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  ENV_NAME: <production-environment-name>
+  TEMPLATE_FILE: infra/app-serving.cfn.yaml
+  BUILD_DIR: dist
+  HASHED_ASSETS_DIR: assets
+
+jobs:
+  deploy:
+    name: Deploy production
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build
+        run: npm run build
+        env:
+          BASE_PATH: /
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ARN }}
+          aws-region: ${{ secrets.AWS_DEPLOY_REGION }}
+
+      - name: Deploy production hosting
+        run: |
+          set -euo pipefail
+          aws cloudformation deploy \
+            --stack-name "$ENV_NAME" \
+            --template-file "$TEMPLATE_FILE" \
+            --parameter-overrides ResourceName="$ENV_NAME" EnvironmentType=prod \
+            --no-fail-on-empty-changeset
+          output() {
+            aws cloudformation describe-stacks --stack-name "$ENV_NAME" \
+              --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text
+          }
+          {
+            echo "BUCKET=$(output BucketName)"
+            echo "DISTRIBUTION_ID=$(output DistributionId)"
+            echo "DISTRIBUTION_DOMAIN=$(output DistributionDomainName)"
+          } >> "$GITHUB_ENV"
+
+      - name: Upload
+        run: |
+          set -euo pipefail
+          if [ -d "$BUILD_DIR/$HASHED_ASSETS_DIR" ]; then
+            aws s3 sync "$BUILD_DIR/$HASHED_ASSETS_DIR" "s3://$BUCKET/$HASHED_ASSETS_DIR" \
+              --cache-control "public,max-age=31536000,immutable"
+          fi
+          aws s3 sync "$BUILD_DIR" "s3://$BUCKET" --delete \
+            --exclude "$HASHED_ASSETS_DIR/*" --cache-control "no-cache"
+          id=$(aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" \
+            --paths "/*" --query Invalidation.Id --output text)
+          aws cloudfront wait invalidation-completed --distribution-id "$DISTRIBUTION_ID" --id "$id"
+          echo "Production: https://${DISTRIBUTION_DOMAIN}/" >> "$GITHUB_STEP_SUMMARY"

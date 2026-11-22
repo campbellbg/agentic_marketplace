@@ -1,15 +1,15 @@
 ---
 name: agentic-build-environment
-description: Use this skill to set up, seed, review or change the `## Agentic build environment` section of the project's CLAUDE.md - the settings the agentic-build command, its agents and the gitprocess skill read (requirements directory, source and test dirs, check and test commands, local test setup, test conventions, CI-only skip form, dev server, stack and deployment, git remote, base branch, branch name rules, branch protection). Trigger on phrases like "set up the agentic environment", "set up the agentic build environment", "agentic environment variables", "configure agentic build", "agentic settings", "change the agentic base branch", and whenever the agentic-build command finds the section missing.
+description: Use this skill to set up, seed, review or change the `## Agentic build environment` section of the project's CLAUDE.md. That section holds the settings the agentic-build command, its agents and the gitprocess skill read (requirements directory, source and test dirs, technology stack, deployment, hosting pattern, production environment name, secrets, git remote, base branch). Trigger on phrases like "set up the agentic environment", "set up the agentic build environment", "agentic environment variables", "configure agentic build", "agentic settings", "change the agentic base branch", and whenever the agentic-build command finds the section missing.
 ---
 
 # Agentic Build Environment
 
 Seed or update the `## Agentic build environment` section of the project's
-`CLAUDE.md`. The agentic-build command, its agents and the gitprocess skill
-read their project settings from this section. Every value comes from the user:
-you detect a suggestion for each one, but the user confirms or replaces it.
-Never write a value the user has not confirmed.
+`CLAUDE.md`. The `agentic-conventions` skill (load it) lists these settings
+and the defaults agents use when one is not set. Every value comes from the
+user: you detect a suggestion for each one, but the user confirms or replaces
+it. Never write a value the user has not confirmed.
 
 ## 1. Find the current state
 
@@ -31,52 +31,49 @@ run tests, or change anything.
 |---------|------------------------|
 | Requirements dir | An existing `requirements/` or similar directory holding `feat_*` folders; else `requirements/` |
 | Source and test dirs | Top-level dirs such as `src/`, `lib/`, `app/`, `test/`, `tests/`, `spec/` |
-| Check command | Typecheck, lint or build scripts in `package.json`, `Makefile`, `pyproject.toml` etc. |
-| Test command | The test script or tool (e.g. `npm test`, `pytest`, `go test ./...`) |
-| Local test setup | Env vars, ports or flags the test config uses (e.g. a `baseURL`/`BASE_URL` in a Playwright config, a `webServer` port) |
-| Test conventions | Patterns in existing tests and test config worth enforcing |
-| CI-only skip form | Existing skips in the tests that mention CI; else the framework's skip with a `CI only: <dependency>` reason |
-| Dev server | A `start`/`dev`/`serve` script and the port it uses |
-| Stack and deployment | Manifests, infrastructure-as-code (CloudFormation, Terraform, Kubernetes, Docker) and CI workflows (`.github/workflows/`) |
+| Technology stack | Manifests and source, grouped by area (e.g. front-end, back-end, infrastructure, tests), each with its languages and frameworks |
+| Deployment | Infrastructure-as-code (CloudFormation, Terraform, Kubernetes, Docker) and CI workflows (`.github/workflows/`). Unless the repo clearly does something else, suggest the conventions' default |
+| Hosting pattern | Which `deploy-environments` pattern the project's production and per-PR preview environments follow. Suggest `app-serving` for a static single-page app (e.g. Vite, Create React App or Angular build with no server code); otherwise `None` |
+| Production environment name | The base name of the project's AWS resources (production uses it as is, non-production adds `-nonprod`). Suggest the repo directory name as a slug: lowercase, every run of characters other than `a-z0-9` replaced by `-`, trimmed, at most 40 characters, prefixed with `app-` if it does not start with a letter. `None` when Hosting pattern is `None` |
+| Secrets | A `secrets/` directory and whether `.gitignore` covers it (`git check-ignore -q secrets/`). Unless the repo clearly does something else, suggest the conventions' default |
 | Git remote | `git remote -v`: `origin`, or the only remote |
-| Base branch | `git symbolic-ref --short refs/remotes/<remote>/HEAD` (minus the `<remote>/` prefix), else `main` or `master`, whichever exists |
-| Branch name rules | Anything the CI workflows do with the branch name (paths, environment names); else `a-z`, `0-9`, `_`, `-` |
-| Branch protection | `gh api repos/{owner}/{repo}/rules/branches/<base>` (rulesets) and `.../branches/<base>/protection`, if `gh` is authenticated; else unknown |
+| Base branch | The remote's default branch (`git symbolic-ref --short refs/remotes/<remote>/HEAD`, minus the `<remote>/` prefix); if it has none, the current branch (`git branch --show-current`); if that is empty, `main`. Offer `main` or `master`, whichever it is not, as the alternative |
 
 ## 3. Ask the user for every setting
 
-Ask about **all thirteen settings**, in this order, so nothing is skipped:
+**AWS access is not a setting** (see the conventions). Do not ask about AWS
+credentials or region, and do not write them to the section.
+
+Ask about **all nine settings**, in this order, so nothing is skipped:
 
 1. Requirements dir
 2. Source and test dirs
-3. Check command
-4. Test command
-5. Local test setup
-6. Test conventions
-7. CI-only skip form
-8. Dev server (command and port, or none)
-9. Stack and deployment
-10. Git remote
-11. Base branch
-12. Branch name rules
-13. Branch protection
+3. Technology stack
+4. Deployment
+5. Hosting pattern
+6. Production environment name
+7. Secrets
+8. Git remote
+9. Base branch
 
-Use the AskUserQuestion tool, up to four settings per call, so four rounds cover
+Use the AskUserQuestion tool, up to four settings per call, so three rounds cover
 everything. For each setting:
 
 - Make the question stand alone: name the setting, say in a few words what the
   agents use it for, and show what you detected.
-- Offer the detected value as the first option, marked `(Recommended)`, plus one
+- Offer the detected value as the first option, marked `(Recommended)`. Add one
   or two real alternatives where there are any (e.g. `main` and `master`), and
-  `None` where a setting can be empty (check command, local test setup, test
-  conventions, dev server, branch protection). The user types any other value
-  through the "Other" option.
-- For long free-text settings (test conventions, stack and deployment, branch
-  protection), put a short summary of what you detected in the option and the
+  `None` where a setting can be empty (Hosting pattern, Production environment
+  name). The user types any other value through the "Other" option.
+- For long free-text settings (technology stack, deployment,
+  secrets), put a short summary of what you detected in the option and the
   full text in its description.
 
 If an answer is unclear or contradicts the repo (e.g. a remote that `git remote`
-does not list), say so and ask again for that setting only.
+does not list), say so and ask again for that setting only. If Hosting pattern is
+not `None`, Production environment name must be set too. It must match
+`^[a-z][a-z0-9-]{1,38}[a-z0-9]$`, because it becomes S3 bucket and CloudFormation
+stack names. Ask again until both hold.
 
 ## 4. Confirm and write
 
@@ -91,24 +88,41 @@ in backticks where they are commands or paths, `None` where the user chose none:
 ## Agentic build environment
 - Requirements dir: `<dir>/`
 - Source and test dirs: `<dir>/`, `<dir>/`
-- Check command: `<command>` | None
-- Test command: `<command>`
-- Local test setup: <how to run the tests locally, or None>
-- Test conventions: <rules, as sub-bullets if more than one, or None>
-- CI-only skip form: <the skip line(s) to use>
-- Dev server: `<command>` on port <port> | None
-- Stack and deployment: <one or two lines>
+- Technology stack:
+  - <area>: <languages, frameworks>
+  - <area>: <languages, frameworks>
+- Deployment: <how and where deployments run>
+- Hosting pattern: `<pattern>` or None
+- Production environment name: `<name>` or None
+- Secrets: <how secrets are created and referenced>
 - Git remote: `<remote>`
 - Base branch: `<branch>`
-- Branch name rules: <allowed characters, and why if CI depends on it>
-- Branch protection: <rules and required checks, or None known>
 ```
 
-- **Existing section:** replace it in place (from its heading to the next `## `
-  heading or the end of the file), renaming an old `## Agentic build` heading.
-  Leave the rest of `CLAUDE.md` unchanged.
+- **Existing section:** replace it in place, from its heading to the next `## `
+  heading or the end of the file:
+  - rename an old `## Agentic build` heading;
+  - split an old `Stack and deployment` line into Technology stack, Deployment
+    and Secrets;
+  - if the section lacks the Hosting pattern and Production environment name
+    lines, ask about just those two settings and add them;
+  - remove lines the format no longer has. AWS credentials and AWS region are
+    dropped. Check command, test command, local test setup, test conventions,
+    CI-only skip form, dev server, branch name rules and branch protection are
+    worked out from the repo (see the conventions). If such a line holds a
+    project-specific value, move it unchanged under a `## Build and test notes`
+    section after this one, which the agents read and which wins over what they
+    would work out.
+
+  In your report, list what you dropped and what you moved. Leave the rest of
+  `CLAUDE.md` unchanged.
 - **No section:** append it to the end of `CLAUDE.md`, after a blank line.
 - **No `CLAUDE.md`:** create it with a `# <project name>` heading and the section.
 
-Do not commit the change; the gitprocess skill or the user does that. Report the
-path you wrote and any settings left as `None`.
+If Secrets uses a `secrets/` directory that `.gitignore` does not cover, add
+`secrets/` to `.gitignore` and say so.
+
+Do not commit the change. The build loop carries `CLAUDE.md` and `.gitignore`
+onto the feature branch and commits them with the feature; otherwise the user or
+the gitprocess skill commits them. Report the path you wrote and any settings
+left as `None`.

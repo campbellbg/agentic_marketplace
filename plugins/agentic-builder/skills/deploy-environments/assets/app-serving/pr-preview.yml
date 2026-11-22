@@ -1,0 +1,170 @@
+# PR preview (agentic-builder pattern app-serving).
+# Deploys this PR's build to the shared non-production environment at
+# https://<nonprod-domain>/pr-<number>/, tests it, and removes it when the PR
+# closes. Keep the structure; adapt only the build steps, BUILD_DIR,
+# HASHED_ASSETS_DIR and the test command. Pin actions to commit SHAs.
+name: PR preview
+
+on:
+  pull_request:
+    branches: [<base-branch>]
+    types: [opened, synchronize, reopened, closed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  ENV_NAME: <production-environment-name>
+  TEMPLATE_FILE: infra/app-serving.cfn.yaml
+  BUILD_DIR: dist
+  HASHED_ASSETS_DIR: assets
+  PR_NUMBER: ${{ github.event.pull_request.number }}
+
+jobs:
+  deploy:
+    name: Deploy preview
+    if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    outputs:
+      preview_url: ${{ steps.publish.outputs.preview_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build for the PR slot
+        run: npm run build
+        env:
+          BASE_PATH: /pr-${{ github.event.pull_request.number }}/
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ARN }}
+          aws-region: ${{ secrets.AWS_DEPLOY_REGION }}
+
+      - name: Deploy shared non-production hosting
+        run: |
+          set -euo pipefail
+          stack="${ENV_NAME}-nonprod"
+          wait_for_stack() {
+            for _ in $(seq 1 60); do
+              status=$(aws cloudformation describe-stacks --stack-name "$stack" \
+                --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo NONE)
+              case "$status" in
+                *_IN_PROGRESS) sleep 15 ;;
+                *) return 0 ;;
+              esac
+            done
+            echo "Stack $stack is still updating after 15 minutes." >&2
+            return 1
+          }
+          # Other PRs update the same shared stack: wait for it to settle, and
+          # retry if another PR started an update at the same moment.
+          for attempt in 1 2 3; do
+            wait_for_stack
+            if aws cloudformation deploy \
+                --stack-name "$stack" \
+                --template-file "$TEMPLATE_FILE" \
+                --parameter-overrides ResourceName="$stack" EnvironmentType=nonprod \
+                --no-fail-on-empty-changeset; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              exit 1
+            fi
+            echo "Deploy attempt $attempt failed; retrying in case another PR was updating the stack." >&2
+            sleep 20
+          done
+          output() {
+            aws cloudformation describe-stacks --stack-name "$stack" \
+              --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text
+          }
+          {
+            echo "BUCKET=$(output BucketName)"
+            echo "DISTRIBUTION_ID=$(output DistributionId)"
+            echo "DISTRIBUTION_DOMAIN=$(output DistributionDomainName)"
+          } >> "$GITHUB_ENV"
+
+      - name: Upload to the PR slot
+        run: |
+          set -euo pipefail
+          slot="pr-${PR_NUMBER}"
+          if [ -d "$BUILD_DIR/$HASHED_ASSETS_DIR" ]; then
+            aws s3 sync "$BUILD_DIR/$HASHED_ASSETS_DIR" "s3://$BUCKET/$slot/$HASHED_ASSETS_DIR" \
+              --cache-control "public,max-age=31536000,immutable"
+          fi
+          aws s3 sync "$BUILD_DIR" "s3://$BUCKET/$slot" --delete \
+            --exclude "$HASHED_ASSETS_DIR/*" --cache-control "no-cache"
+          id=$(aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" \
+            --paths "/$slot/*" --query Invalidation.Id --output text)
+          aws cloudfront wait invalidation-completed --distribution-id "$DISTRIBUTION_ID" --id "$id"
+
+      - name: Publish the preview URL
+        id: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_ACTION: ${{ github.event.action }}
+        run: |
+          set -euo pipefail
+          url="https://${DISTRIBUTION_DOMAIN}/pr-${PR_NUMBER}/"
+          echo "preview_url=$url" >> "$GITHUB_OUTPUT"
+          echo "Preview: $url" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$EVENT_ACTION" = opened ] || [ "$EVENT_ACTION" = reopened ]; then
+            gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body "Preview: $url"
+          fi
+
+  test-preview:
+    name: Test preview
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run the test suite against the preview
+        run: npm test # the project's test command; CI-only tests run when PREVIEW_URL is set
+        env:
+          PREVIEW_URL: ${{ needs.deploy.outputs.preview_url }}
+
+  teardown:
+    name: Remove preview
+    if: github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ARN }}
+          aws-region: ${{ secrets.AWS_DEPLOY_REGION }}
+      - name: Remove the PR slot
+        run: |
+          set -euo pipefail
+          stack="${ENV_NAME}-nonprod"
+          output() {
+            aws cloudformation describe-stacks --stack-name "$stack" \
+              --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text
+          }
+          if ! bucket=$(output BucketName 2>/dev/null) || [ -z "$bucket" ] || [ "$bucket" = None ]; then
+            echo "No non-production stack; nothing to remove."
+            exit 0
+          fi
+          distribution_id=$(output DistributionId)
+          aws s3 rm "s3://$bucket/pr-${PR_NUMBER}/" --recursive
+          aws cloudfront create-invalidation --distribution-id "$distribution_id" \
+            --paths "/pr-${PR_NUMBER}/*" > /dev/null
+          echo "Removed preview pr-${PR_NUMBER}." >> "$GITHUB_STEP_SUMMARY"
