@@ -9,9 +9,12 @@ Turn my description into an approved requirement and build plan for the
 agentic build loop. First load the `agentic-conventions` skill: it defines the
 settings, the feature directory and the requirement template this command uses.
 
-This is the conversational half of the workflow: ask me whenever you need a
-decision. `/agentic-build` is the unattended half and starts only from a
-requirement this command has approved.
+This is the conversational half of the workflow, but only where I am needed:
+ask me when you need a decision only I can make, or when the review does not
+approve the requirement. I trust `decompose-requirement` to review and plan
+well, so its `APPROVED` verdict is the approval: do not ask me to approve the
+requirement or the plan. `/agentic-build` is the unattended half and starts only
+from a requirement the review has approved.
 
 **Never** create branches, commit, push, or write code here. The only files you
 write are `requirement.md` (only as described below) and, through
@@ -58,12 +61,13 @@ Look at `$ARGUMENTS`:
    `**AC-n** Given / when / then`, each one observable and testable, Out of
    Scope, and Definition of Done. Remove the template's HTML comments.
 4. Show me the path, the title and the AC list in a few lines, then go straight
-   to the review. I approve the requirement and the plan together in step 5.
+   to the review without waiting for me.
 
 ## 4. Review and plan
 
 Run the `decompose-requirement` agent on the feature. Pass it only the feature
-name, plus any planning guidance I gave in step 5.
+name, plus any planning guidance I gave (with the description, or after a
+step 5 report).
 
 - **`Verdict: CHANGES NEEDED`:** show me its Suggested Changes table and
   Questions for the User. Ask which changes to accept and get my answers to the
@@ -85,17 +89,18 @@ name, plus any planning guidance I gave in step 5.
   `<requirements-dir>/<feat>/requirement-decomposed.md` yourself, then go on.
 - **`Saved to: ... | Verdict: APPROVED ...`:** go to step 5.
 
-## 5. Approve
+## 5. Report the approved plan
 
-Read `requirement-decomposed.md` and show me:
+The review's `APPROVED` verdict approves the requirement and the plan. Do not
+ask me to accept them. Read `requirement-decomposed.md` and show me, briefly:
 
 - the plan: **single build** or **<n> iterations**, with the agent's reason;
 - the Iteration Overview table;
-- the review notes, and every Prerequisite for the User.
+- the review notes, and every Prerequisite for the User, flagged clearly as
+  things I must do myself.
 
-Ask me to choose:
+Then go straight to step 6. If I later reply asking for a change, handle it:
 
-- **Accept:** go to step 6.
 - **Change the requirement:** draft my changes into `requirement.md` and go back
   to step 4.
 - **Change the plan only** (e.g. "build it in one go", "split the API from the

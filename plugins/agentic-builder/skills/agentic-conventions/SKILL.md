@@ -108,7 +108,8 @@ git status --porcelain -uall     # plus new, untracked files
 
 **Two stages.** The requirement stage (`/agentic-requirement`) is interactive:
 it writes `requirement.md`, has `decompose-requirement` review it and plan the
-build, and ends when the user approves the plan. The build stage
+build, and ends when the review approves it (the user is asked only when the
+review does not approve, or a decision is theirs to make). The build stage
 (`/agentic-build`) runs unattended and starts only from an approved
 `requirement-decomposed.md` whose `Source hash` matches `requirement.md`. Rounds
 belong to the build stage only.
