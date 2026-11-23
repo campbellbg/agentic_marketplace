@@ -1,5 +1,5 @@
 ---
-description: Run the agentic build loop for a feature (decompose, build, review, commit per iteration, then ship)
+description: Run the agentic build loop for a feature whose requirement /agentic-requirement has approved - build, review and commit each iteration on a feature branch, then open the PR and merge on green CI. Use when the user says "build feat_NNNN", "implement feat_NNNN", "start the build", "run the agentic build", "kick off the build loop", or asks to build or implement an approved requirement. Takes the feature name; with none, lists the features and asks which to build.
 argument-hint: <feature name, e.g. feat_0002>
 ---
 
@@ -23,7 +23,8 @@ command that would fix it, and build nothing. Do not fix these yourself.
    `agentic-build-environment` skill to set it up with me. Re-read `CLAUDE.md`
    when it is written. If I decline, or the section is still missing, stop.
    The skill leaves `CLAUDE.md` and `.gitignore` uncommitted; step 0 carries
-   them onto the feature branch.
+   them onto the feature branch, with this feature's requirement files. Other
+   features' uncommitted requirement drafts stay behind, uncommitted.
 3. **Remote and base branch.** Read the settings as the conventions describe.
    The Git remote exists (`git remote`), otherwise stop (e.g.
    `gh repo create --source . --private --push`). The base branch exists on it
@@ -32,18 +33,30 @@ command that would fix it, and build nothing. Do not fix these yourself.
 4. **Feature.** If no feature was given (`$ARGUMENTS` is empty), list the
    directories under `<requirements-dir>/` and ask me which to build. Otherwise
    `<requirements-dir>/$ARGUMENTS/requirement.md` must exist. If it does not,
-   stop and point me at the requirement template in the `agentic-conventions`
-   skill (`assets/requirement-template.md`).
+   stop and suggest `/agentic-requirement <description>` to create it.
+5. **Approved plan.** The requirement stage (`/agentic-requirement`) reviews and
+   plans the requirement; this loop does not. In
+   `<requirements-dir>/$ARGUMENTS/`, `requirement-decomposed.md` must exist,
+   read `Verdict: APPROVED`, and its `Source hash` must equal the hex digest
+   (first field) of `sha256sum requirement.md`.
+   - Missing or not approved: stop and suggest `/agentic-requirement $ARGUMENTS`.
+   - Hash differs: the requirement changed after it was approved. If the
+     feature branch already has iteration commits
+     (`git log --all --oneline --grep '^$ARGUMENTS: .*iteration'`), **stop and
+     ask me**: it changed part-way through the build. Otherwise stop and suggest
+     `/agentic-requirement $ARGUMENTS` to re-review it.
 
 From here on, `<feat>` means `$ARGUMENTS`. Run the loop **without stopping to ask
 between rounds or iterations**. Only stop where the steps below say to.
 
 ## Agents
 
-- **`decompose-requirement`** checks that `requirement.md` is fit to build. If it
-  is, it writes `requirement-decomposed.md`: the iterations, each built,
-  reviewed and committed on its own, with its own Definition of Done. Meeting
-  the last iteration's Definition of Done means the feature is done.
+The plan comes from `requirement-decomposed.md`, which `decompose-requirement`
+wrote during `/agentic-requirement`: one iteration (a single build) or several,
+each built, reviewed and committed on its own, with its own Definition of Done.
+Meeting the last iteration's Definition of Done means the feature is done. This
+loop never runs `decompose-requirement` and never edits either requirement file.
+
 - **`code-builder`** writes code and tests for one iteration. Run it again on the
   same iteration to fix the latest round's findings.
 - **Review agents:** every agent named `review-<name>` in this plugin or the
@@ -58,8 +71,8 @@ between rounds or iterations**. Only stop where the steps below say to.
 - **`consolidate-reviews`** turns a round's reports into build directions and
   judges the iteration's Definition of Done.
 
-Pass each agent only `<feat>`, the iteration and, for every agent except
-`decompose-requirement`, the round. They read their own settings.
+Pass each agent only `<feat>`, the iteration and the round. They read their own
+settings.
 
 **Round** (`<NNN>`): before each `code-builder` run, take one more than the
 highest `<NNN>` of any round file in `<requirements-dir>/<feat>/`
@@ -78,17 +91,7 @@ Use the `gitprocess` skill for all branch, commit, push, PR and merge work.
 0. **Branch.** Use `gitprocess` to create (or switch to) the feature branch for
    `<feat>` from an up-to-date base branch.
 
-1. **Decompose the requirement.**
-   - If `requirement-decomposed.md` exists and its `Source hash` equals the hex
-     digest (first field) of `sha256sum <requirements-dir>/<feat>/requirement.md`,
-     reuse it and go to step 2.
-   - If the hash differs and the branch already has iteration commits,
-     **stop and ask me**: the requirement changed part-way through the build.
-   - Otherwise run `decompose-requirement` on `<feat>`. If it returns
-     `Verdict: CHANGES NEEDED`, **stop and show me its suggested changes**. Do
-     not edit `requirement.md` yourself.
-
-2. **For each iteration** in `requirement-decomposed.md`, in order. Skip any
+1. **For each iteration** in `requirement-decomposed.md`, in order. Skip any
    iteration that already has a non-WIP `<feat>: iteration <k>/<n>` commit on
    the branch.
    a. Work out the round, then run `code-builder` on `<feat>`, the iteration
@@ -111,11 +114,11 @@ Use the `gitprocess` skill for all branch, commit, push, PR and merge work.
       Commit and push it as WIP with `gitprocess` (no PR), report what is still
       open, and do not start the next iteration.
 
-3. **Ship.** After the last iteration, use `gitprocess` to ship the feature:
+2. **Ship.** After the last iteration, use `gitprocess` to ship the feature:
    open the PR, wait for its CI checks, and merge if they are green. If a check
    fails, do not merge: report the failure and leave the PR open.
 
-4. **Summarise** for me:
+3. **Summarise** for me:
    - each iteration and its number of rounds;
    - any warnings;
    - the ship result, including the preview URL, production deploy and preview
@@ -128,5 +131,5 @@ Use the `gitprocess` skill for all branch, commit, push, PR and merge work.
 
 - If the builder or a review agent raises an open question that changes the
   requirement, **stop and ask me** instead of guessing.
-- Otherwise, stop only at the points named in pre-flight and in steps 1, 2b, 2g
-  and 3.
+- Otherwise, stop only at the points named in pre-flight and in steps 1b, 1g
+  and 2.

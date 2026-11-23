@@ -1,12 +1,13 @@
 ---
 name: agentic-conventions
-description: Shared conventions of the agentic-builder plugin - project settings and their defaults, fixed AWS access, how to find what a feature changed, the feature directory and its files, the review report protocol (round numbers, Summary line, verdict and severity rules) and the rules every test follows. Preloaded into the agentic-builder agents; load it whenever you work on the agentic build loop, its agents or its files outside them.
+description: Shared conventions of the agentic-builder plugin - project settings and their defaults, fixed AWS access, how to find what a feature changed, the feature directory and its files (including the requirement template), the review report protocol (round numbers, Summary line, verdict and severity rules) and the rules every test follows. Preloaded into the agentic-builder agents; load it whenever you work on the agentic-requirement or agentic-build commands, their agents or their files outside them.
 user-invocable: false
 ---
 
 # Agentic build conventions
 
-The single source for what the `agentic-build` command, its agents and the
+The single source for what the `agentic-requirement` and `agentic-build`
+commands, their agents and the
 `gitprocess`, `agentic-build-environment` and `deploy-environments` skills share.
 Where one of them says "see the conventions", it means this file.
 
@@ -66,8 +67,15 @@ git status --porcelain -uall     # plus new, untracked files
 
 | File | Written by | Notes |
 |------|-----------|-------|
-| `requirement.md` | the user | What was asked for. Nobody else ever edits it. Format: [assets/requirement-template.md](assets/requirement-template.md). |
-| `requirement-decomposed.md` | `decompose-requirement` only | The iterations, each with its acceptance criteria, Tests table and Definition of Done. The build's input. |
+| `requirement.md` | the user, or drafted from their description by the `agentic-requirement` command | What was asked for. Only the user, or `agentic-requirement` with the user's explicit approval, changes it; no agent ever edits it. Format: [assets/requirement-template.md](assets/requirement-template.md). |
+| `requirement-decomposed.md` | `decompose-requirement` only, run by `agentic-requirement` | The approved plan: a single build or iterations, each with its acceptance criteria, Tests table and Definition of Done. The build's input. One file with no round number, replaced in full each time the requirement is re-reviewed. |
+
+**Two stages.** The requirement stage (`/agentic-requirement`) is interactive:
+it writes `requirement.md`, has `decompose-requirement` review it and plan the
+build, and ends when the user approves the plan. The build stage
+(`/agentic-build`) runs unattended and starts only from an approved
+`requirement-decomposed.md` whose `Source hash` matches `requirement.md`. Rounds
+belong to the build stage only.
 | `build_<NNN>.md` | `code-builder` | Its report for the round: what changed, coverage by AC ID, and the reason for any finding it did not fix. |
 | `review_<reviewer>_<NNN>.md` | each review agent | `<reviewer>` is the agent name without `review-` (`review-code` -> `review_code_004.md`). |
 | `review_consolidated_<NNN>.md` | `consolidate-reviews` | The round's build directions for `code-builder`. |

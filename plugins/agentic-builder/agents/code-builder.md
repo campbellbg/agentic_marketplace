@@ -2,10 +2,11 @@
 name: code-builder
 description: >
   Builds or changes source code and its tests to implement one iteration of a
-  decomposed requirement. Use when the user asks to implement a feature (e.g.
-  "implement feat_0003" or "build feat_0003"), and again after a
-  consolidate-reviews pass to fix the findings it directs. Pass it the feature
-  name (feature directory), the iteration number and the round.
+  decomposed requirement, and again after a consolidate-reviews pass to fix the
+  findings it directs. Run by the agentic-build loop; when the user asks to
+  build or implement a feature, run the /agentic-build command instead of
+  this agent directly. Pass it the feature name (feature directory), the
+  iteration number and the round.
 model: claude-sonnet-5-5
 skills: [agentic-builder:agentic-conventions]
 color: green

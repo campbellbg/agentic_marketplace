@@ -70,36 +70,40 @@ mixed to describe in one subject line.
 
 ## 1. Create a feature branch
 
+- **First, check uncommitted changes** with `git status --porcelain -uall`,
+  before switching to any branch. Git keeps uncommitted files in the working
+  tree across a switch, so this check decides what comes along. Sort each file:
+  - **Carried over:** the requirement is written on `<base-branch>` by
+    `/agentic-requirement` before a build, and a first build sets up the
+    environment there too. These may be modified or new:
+    - anything under `<requirements-dir>/<feat>/` (this feature only);
+    - `CLAUDE.md`;
+    - `.gitignore`.
+
+    They come onto the feature branch and are committed with the feature. Tell
+    the user in your report which were carried over.
+  - **Left behind:** anything under another feature's directory,
+    `<requirements-dir>/feat_*/` other than `<feat>`. These are requirements
+    drafted for later builds. They stay in the working tree, uncommitted, and
+    action 2 never stages them. List them in your report.
+  - **Anything else**: **stop and tell the user**, because it would be swept
+    into the feature's commit.
 - If a branch for this feature already exists (`git branch --list '<feat>-*'`,
-  `git ls-remote --heads <remote> '<feat>-*'`), switch to it and stop. Files that
-  may be carried over (below) come along. If the switch is refused because the
-  branch has its own changes to one of them, stop and tell the user.
+  `git ls-remote --heads <remote> '<feat>-*'`), switch to it and stop. If the
+  switch is refused because the branch has its own changes to a carried or
+  left-behind file, stop and tell the user.
 - If `<base-branch>` does not exist on `<remote>`
   (`git ls-remote --heads <remote> <base-branch>` is empty), stop and tell the
   user. The base branch needs an initial commit pushed first, and this skill
   never commits to it.
-- Check for uncommitted changes with `git status --porcelain -uall`:
-  - **May be carried over:** the requirement is usually written on
-    `<base-branch>` just before a build, and a first build sets up the
-    environment there too. These files may be modified or new:
-    - `<requirements-dir>/<feat>/requirement.md`
-    - `<requirements-dir>/<feat>/requirement-decomposed.md`
-    - `CLAUDE.md`
-    - `.gitignore`
-
-    Carry them onto the feature branch automatically: `git checkout -b` keeps
-    them in the working tree, and they are committed with the feature. Tell the
-    user in your report which were carried over.
-  - **Anything else**: **stop and tell the user**, because it would be swept
-    into the feature's commit.
 - Start from an up-to-date `<base-branch>`:
   ```bash
   git checkout <base-branch>
   git pull --ff-only <remote> <base-branch>
   git checkout -b <branch>
   ```
-  If the pull or checkout fails because it would overwrite a carried file, stop
-  and tell the user. Do not stash, reset or discard it.
+  If the pull or checkout fails because it would overwrite a carried or
+  left-behind file, stop and tell the user. Do not stash, reset or discard it.
 
 ## 2. Commit and/or push
 
@@ -113,12 +117,18 @@ mixed to describe in one subject line.
 
   Also stop if a large or binary file appears that you did not expect, or if that
   secrets directory exists and `git check-ignore -q secrets/` says it is not
-  ignored. Otherwise:
+  ignored. Other features' requirement directories are not a reason to stop:
+  they are never staged. Otherwise:
   ```bash
-  git add -A
+  # everything except other features' requirement dirs, then this feature's dir
+  git add -A -- . ':(exclude)<requirements-dir>/feat_*'
+  git add -A -- '<requirements-dir>/<feat>/'
   git commit -F <message-file>     # subject, body, trailer as derived above
   git push -u <remote> <current-branch>
   ```
+  With no feature directory (a `chore-` branch), run only the first `git add`,
+  so no requirement drafts are swept in. Check what was staged
+  (`git diff --cached --stat`) before committing.
   Write the message to a file in the scratchpad directory and pass it with
   `-F`, so quotes and newlines survive.
 - If only a commit was asked for, stop after the commit. If there is nothing

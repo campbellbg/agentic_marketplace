@@ -4,6 +4,8 @@
 Save as <requirements-dir>/feat_NNNN/requirement.md, where the directory name
 matches the heading. The heading and Summary feed the branch name, commit
 subjects and PR text. Delete these comments when you write the requirement.
+`/agentic-requirement <description>` drafts this file for you, then reviews and
+plans it; run `/agentic-requirement feat_NNNN` on a file you wrote by hand.
 -->
 
 ## Summary
@@ -28,6 +30,12 @@ a test can check. Say what happens, not how to build it.
 ## Out of Scope
 
 - <Nearby work this feature must not do.>
+
+## Open Questions
+
+<!-- Optional. Anything still undecided. Every question that would change what
+gets built must be answered before the requirement is approved. Remove the
+section if there are none. -->
 
 ## Definition of Done
 
