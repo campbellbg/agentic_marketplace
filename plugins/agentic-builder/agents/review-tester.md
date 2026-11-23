@@ -42,7 +42,9 @@ can be trusted.
      not take its base URL from `PREVIEW_URL`, or does not skip when it is unset.
 3. **Run what can run locally.** Run the check command, if there is one, then the
    whole suite, as the conventions' test rules say. Always run the whole suite, so
-   earlier features are covered too.
+   earlier features are covered too. The builder ran only a targeted run, so this
+   is the only full local run in the round: never skip it or narrow it based on
+   the builder's results.
 4. **Re-run any failed test once**, on its own, with the runner's filter (e.g.
    `-g "<title>"`, `-k <name>`, `--testNamePattern`). A test that fails and then
    passes is flaky, which is a finding, not a pass.

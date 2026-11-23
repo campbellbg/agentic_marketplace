@@ -71,9 +71,13 @@ covers. Use it to choose a mode:
    where one is practical. If a test needs a new tool or setup step in CI, add it
    to every CI workflow that runs the tests and say so in your report. Do not add
    secrets or cloud resources for a test; raise it as an open question.
-6. **Verify.** Run the suite as the conventions' test rules say. All tests must
-   pass before you finish, apart from `CI only` tests, which skip here; list
-   those in your report as not run.
+6. **Verify.** Do a targeted run as the conventions' test rules say: the check
+   command, then only this iteration's planned tests and the tests in files you
+   created or changed. Do not run the whole suite; review-tester runs it next as
+   the gate. Every test you run must pass before you finish, apart from
+   `CI only` tests, which skip here; list those in your report as not run.
+   Under Verification, give the exact command and say it was a targeted run (or
+   why you fell back to the whole suite).
 7. **Do not edit** `requirement.md`, `requirement-decomposed.md` or any
    `review_*_<NNN>.md` file.
 

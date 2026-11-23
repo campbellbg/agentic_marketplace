@@ -212,6 +212,15 @@ stops and asks the user.
   own server, first check that nothing already listens on its port
   (`ss -ltn`). If something does, the run could test a stale server, so report
   it rather than stopping that process.
+- **Who runs what:** review-tester runs the whole suite every round; its run is
+  the gate that proves the whole suite passes. code-builder runs only a
+  **targeted run**: the check command, if there is one, then just this
+  iteration's planned tests plus the tests in any test file it created or
+  changed, selected with the runner's filter or file arguments (e.g.
+  `npx playwright test <files>`, `pytest <files> -k <name>`,
+  `npx vitest run <files>`). It follows the rest of these rules (no
+  `PREVIEW_URL`, timeout, port check). If the runner cannot select tests, it runs
+  the whole suite instead.
 - Test output directories (e.g. `test-results/`, `playwright-report/`,
   `coverage/`) belong in `.gitignore`, because iteration commits stage
   everything.

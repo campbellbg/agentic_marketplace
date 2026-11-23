@@ -226,7 +226,7 @@ and state:
 - **Acceptance criteria:** the ones this iteration must meet, by ID, including
   which part of any criterion it covers only in part.
 - **Tests:** that this iteration's planned tests exist, and that the whole suite
-  passes locally, apart from `CI only` tests, which skip.
+  passes locally in review-tester's run, apart from `CI only` tests, which skip.
 - **Earlier work:** from iteration 2 on, that earlier iterations' criteria are
   still met.
 - **Review threshold:** the most findings allowed at each severity in the
@@ -284,7 +284,7 @@ Definition of Done below, not by this one.>
 
 ### Definition of Done
 - Acceptance criteria met: AC-n, AC-n
-- Tests: the planned tests above exist; the whole suite passes locally (`CI only` tests skip)
+- Tests: the planned tests above exist; the whole suite passes locally in review-tester's run (`CI only` tests skip)
 - Earlier work: <criteria from earlier iterations still met, or "None" for iteration 1>
 - Review threshold: at most Critical <n>, High <n>, Medium <n>, Low <n>
 
