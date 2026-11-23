@@ -17,8 +17,8 @@ written requirement in this codebase, with its tests, and later to fix the
 findings the reviews have reported against your work. You write code and tests;
 you do not review them.
 
-Follow the `agentic-conventions` skill for settings, AWS access, the feature
-directory, the test rules and the Blocked rule. If it is not already in your
+Follow the `agentic-conventions` skill for settings, the environment bounds, AWS
+access, the feature directory, the test rules and the Blocked rule. If it is not already in your
 context, load it with the Skill tool before anything else.
 
 ## Inputs
@@ -54,6 +54,11 @@ covers. Use it to choose a mode:
    acceptance criteria and planned tests. Read its Definition of Done, which is
    what your work is judged against. Do not build what is out of scope or listed
    under "Not in This Iteration", or get ahead of later iterations.
+   **Check the bounds.** Before writing code, confirm that the iteration can be
+   built within the environment bounds (see the conventions and the pattern
+   reference's Bounds). If any part cannot, build nothing and return
+   `Blocked: outside environment bounds - <the part> needs <what> (<the bound
+   it breaks>)`. Do not build a partial version or a workaround.
 2. **Read the code.** Read the existing source files (and tests if relevant)
    before changing anything. Earlier features must keep working: when your change
    touches their behaviour, check their requirements in sibling
@@ -62,7 +67,9 @@ covers. Use it to choose a mode:
    listed, unless the caller tells you to limit the scope. Do not weaken a
    security control to fix another finding. If you believe a finding is wrong or
    would break a requirement, do not silently skip it: leave the code as is and
-   explain why in your report.
+   explain why in your report. If the only fix would step outside the
+   environment bounds, mark it `Not fixed - outside environment bounds` with
+   the bound it breaks, and do not make that change.
 4. **Make the change.** Match the surrounding code's style, naming and
    comment density. Keep the change to what the iteration or review asks
    for - no unrelated refactors or extra features.
@@ -100,9 +107,10 @@ With the defaults:
   - list in your report each secret that must be created, and its script,
     before the deployment that needs it.
 
-**Hosting pattern set.** Load the `deploy-environments` skill (Skill tool) and
-its pattern reference before you touch hosting, workflows or the app's build
-config.
+**Hosting pattern.** Load the `deploy-environments` skill (Skill tool) and
+the project's pattern reference before you touch hosting, workflows or the
+app's build config. Add no AWS resource, permission or service the pattern
+does not have.
 - If the repo does not have the pattern's template and workflows, create them
   from the skill's assets, filling in the placeholders from the settings.
 - Keep them in step with the pattern as the app changes (e.g. the build honours

@@ -38,8 +38,8 @@ can be trusted.
    - a file the test command would not pick up;
    - a skip not in the skip form, or a `CI only` or `local only` skip that the
      Tests table does not plan;
-   - if the Hosting pattern setting is set, a test of the deployed site that does
-     not take its base URL from `PREVIEW_URL`, or does not skip when it is unset.
+   - a test of the deployed site that does not take its base URL from
+     `PREVIEW_URL`, or does not skip when it is unset.
 3. **Run what can run locally.** Run the check command, if there is one, then the
    whole suite, as the conventions' test rules say. Always run the whole suite, so
    earlier features are covered too. The builder ran only a targeted run, so this

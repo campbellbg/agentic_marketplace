@@ -101,9 +101,10 @@ security; report a non-security bug only if it has a security impact.
      secrets, env or code.
    - Nothing deployed outside the Deployment setting (by default, no local
      deploy scripts and nothing deployed outside GitHub Actions).
-   - If the Hosting pattern setting is set: load the `deploy-environments`
-     skill (Skill tool) and check the template and workflows against its
-     pattern reference's Review checklist. In particular:
+   - Load the `deploy-environments` skill (Skill tool) and check the template
+     and workflows against the pattern reference's Review checklist and its
+     Bounds. Any AWS resource, permission or deploy role outside the bounds is
+     at least a High finding. In particular:
      - preview resources and paths come from the PR number, never the branch
        name;
      - teardown removes only that PR's slot;

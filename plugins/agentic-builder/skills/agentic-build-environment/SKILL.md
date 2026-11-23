@@ -33,8 +33,8 @@ run tests, or change anything.
 | Source and test dirs | Top-level dirs such as `src/`, `lib/`, `app/`, `test/`, `tests/`, `spec/` |
 | Technology stack | Manifests and source, grouped by area (e.g. front-end, back-end, infrastructure, tests), each with its languages and frameworks |
 | Deployment | Infrastructure-as-code (CloudFormation, Terraform, Kubernetes, Docker) and CI workflows (`.github/workflows/`). Unless the repo clearly does something else, suggest the conventions' default |
-| Hosting pattern | Which `deploy-environments` pattern the project's production and per-PR preview environments follow. Suggest `app-serving` for a static single-page app (e.g. Vite, Create React App or Angular build with no server code); otherwise `None` |
-| Production environment name | The base name of the project's AWS resources (production uses it as is, non-production adds `-nonprod`). Suggest the repo directory name as a slug: lowercase, every run of characters other than `a-z0-9` replaced by `-`, trimmed, at most 40 characters, prefixed with `app-` if it does not start with a letter. `None` when Hosting pattern is `None` |
+| Hosting pattern | Which `deploy-environments` pattern the project's production and per-PR preview environments follow. Only the patterns that skill lists are allowed (currently `app-serving`, for a static single-page app such as a Vite, Create React App or Angular build with no server code). There is no `None` |
+| Production environment name | The base name of the project's AWS resources (production uses it as is, non-production adds `-nonprod`). Suggest the repo directory name as a slug: lowercase, every run of characters other than `a-z0-9` replaced by `-`, trimmed, at most 40 characters, prefixed with `app-` if it does not start with a letter |
 | Secrets | A `secrets/` directory and whether `.gitignore` covers it (`git check-ignore -q secrets/`). Unless the repo clearly does something else, suggest the conventions' default |
 | Git remote | `git remote -v`: `origin`, or the only remote |
 | Base branch | The remote's default branch (`git symbolic-ref --short refs/remotes/<remote>/HEAD`, minus the `<remote>/` prefix); if it has none, the current branch (`git branch --show-current`); if that is empty, `main`. Offer `main` or `master`, whichever it is not, as the alternative |
@@ -62,18 +62,23 @@ everything. For each setting:
 - Make the question stand alone: name the setting, say in a few words what the
   agents use it for, and show what you detected.
 - Offer the detected value as the first option, marked `(Recommended)`. Add one
-  or two real alternatives where there are any (e.g. `main` and `master`), and
-  `None` where a setting can be empty (Hosting pattern, Production environment
-  name). The user types any other value through the "Other" option.
+  or two real alternatives where there are any (e.g. `main` and `master`). The
+  user types any other value through the "Other" option. Hosting pattern and
+  Production environment name are required: never offer `None` for them.
 - For long free-text settings (technology stack, deployment,
   secrets), put a short summary of what you detected in the option and the
   full text in its description.
 
 If an answer is unclear or contradicts the repo (e.g. a remote that `git remote`
-does not list), say so and ask again for that setting only. If Hosting pattern is
-not `None`, Production environment name must be set too. It must match
+does not list), say so and ask again for that setting only. Hosting pattern must
+be a pattern `deploy-environments` lists, and Production environment name must
+be set. It must match
 `^[a-z][a-z0-9-]{1,38}[a-z0-9]$`, because it becomes S3 bucket and CloudFormation
 stack names. Ask again until both hold.
+
+If the project does not fit any listed pattern (e.g. it has server code), tell
+the user the plugin cannot build it until a matching hosting pattern, with its
+own deploy role, has been added. Do not write the section.
 
 ## 4. Confirm and write
 
@@ -82,7 +87,7 @@ it (AskUserQuestion: "Write it" / "Change something"). On a change, ask about
 those settings again and show it once more.
 
 Then write it to `CLAUDE.md` in exactly this format, one line per setting, values
-in backticks where they are commands or paths, `None` where the user chose none:
+in backticks where they are commands or paths:
 
 ```markdown
 ## Agentic build environment
@@ -92,8 +97,8 @@ in backticks where they are commands or paths, `None` where the user chose none:
   - <area>: <languages, frameworks>
   - <area>: <languages, frameworks>
 - Deployment: <how and where deployments run>
-- Hosting pattern: `<pattern>` or None
-- Production environment name: `<name>` or None
+- Hosting pattern: `<pattern>`
+- Production environment name: `<name>`
 - Secrets: <how secrets are created and referenced>
 - Git remote: `<remote>`
 - Base branch: `<branch>`
@@ -105,7 +110,7 @@ in backticks where they are commands or paths, `None` where the user chose none:
   - split an old `Stack and deployment` line into Technology stack, Deployment
     and Secrets;
   - if the section lacks the Hosting pattern and Production environment name
-    lines, ask about just those two settings and add them;
+    lines, or either says None, ask about just those two settings and set them;
   - remove lines the format no longer has. AWS credentials and AWS region are
     dropped. Check command, test command, local test setup, test conventions,
     CI-only skip form, dev server, branch name rules and branch protection are
@@ -124,5 +129,4 @@ If Secrets uses a `secrets/` directory that `.gitignore` does not cover, add
 
 Do not commit the change. The build loop carries `CLAUDE.md` and `.gitignore`
 onto the feature branch and commits them with the feature; otherwise the user or
-the gitprocess skill commits them. Report the path you wrote and any settings
-left as `None`.
+the gitprocess skill commits them. Report the path you wrote.

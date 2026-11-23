@@ -1,6 +1,6 @@
 ---
 name: deploy-environments
-description: Use this skill whenever work involves a project's production or non-production (ephemeral, per-PR preview) environments - writing, planning, reviewing or shipping the GitHub Actions workflows and CloudFormation that deploy them. It holds the environment model, naming rules and the templates for each hosting pattern (currently `app-serving`). The agentic-build agents and the gitprocess skill load it when the project's `Hosting pattern` setting is not `None`. Trigger on phrases like "ephemeral environment", "PR preview", "preview environment", "deploy to production", "S3 and CloudFront", "hosting pattern".
+description: Use this skill whenever work involves a project's production or non-production (ephemeral, per-PR preview) environments - writing, planning, reviewing or shipping the GitHub Actions workflows and CloudFormation that deploy them. It holds the environment model, naming rules and the templates for each hosting pattern (currently `app-serving`). Every agentic-builder project has a Hosting pattern, so the agentic-build agents and the gitprocess skill always load it. Trigger on phrases like "ephemeral environment", "PR preview", "preview environment", "deploy to production", "S3 and CloudFront", "hosting pattern".
 ---
 
 # Deploy Environments
@@ -15,11 +15,11 @@ From the `## Agentic build environment` section of `CLAUDE.md`:
 
 | Setting | Use |
 |---------|-----|
-| Hosting pattern | Which reference below applies. `None` or missing: this skill does not apply. |
+| Hosting pattern | Which reference below applies. Required. |
 | Production environment name (`<env>`) | The base of every resource name (see Naming). Lowercase letters, digits and `-`, starting with a letter, at most 40 characters. |
 | Base branch (`<base-branch>`) | PRs to it get a preview; pushes to it deploy production. |
 
-If Hosting pattern is set but `<env>` is missing, stop and say so: use the
+If Hosting pattern or `<env>` is missing, stop and say so: use the
 `agentic-build-environment` skill to set it. Do not invent names.
 
 AWS access is fixed, not a setting: follow the AWS access rule in the
@@ -33,8 +33,10 @@ AWS access is fixed, not a setting: follow the AWS access rule in the
 | `app-serving` | [references/app-serving.md](references/app-serving.md) | `assets/app-serving/` |
 
 Read the reference for the project's pattern before writing, planning or
-reviewing anything it covers. A pattern not in this table is not supported yet:
-stop and say so rather than improvising one.
+reviewing anything it covers. Its Bounds section says what a project on that
+pattern can and cannot have. A pattern not in this table is not supported yet:
+stop and say so rather than improvising one. The user adds new patterns, each
+with its own deploy role; agents never do.
 
 ## Environment model (all patterns)
 

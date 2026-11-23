@@ -19,11 +19,12 @@ write are `requirement.md` (only as described below) and, through
 
 ## 1. Settings
 
-Read the settings as the conventions describe. If the root `CLAUDE.md` has no
-`## Agentic build environment` section, tell me and offer to set it up with the
-`agentic-build-environment` skill, because the review checks the requirement
-against the technology stack and Hosting pattern. If I decline, carry on with
-the defaults and say that the plan may need re-running once the settings exist.
+Read the settings as the conventions describe. The review checks the
+requirement against the environment bounds (see the conventions), so the
+environment must be set up first. If the root `CLAUDE.md` has no
+`## Agentic build environment` section, or it does not set a supported Hosting
+pattern and a Production environment name, tell me and offer to set it up with
+the `agentic-build-environment` skill. If I decline, stop.
 
 ## 2. Work out the input
 
@@ -72,7 +73,9 @@ name, plus any planning guidance I gave in step 5.
   passes without approval, stop and tell me what is still open, so I can edit
   the requirement myself and run `/agentic-requirement <feat>` again.
 - **`Verdict: NOT FIT TO BUILD`:** show me its Reasons and What Could Be Built
-  Instead, then stop. Do not edit `requirement.md` to get it past the review,
+  Instead, then stop. Where a reason is `environment`, say plainly that the
+  requirement cannot be met within the current build environment, and that
+  it needs changing to fit or a new hosting pattern (which I add myself). Do not edit `requirement.md` to get it past the review,
   and do not reword the flagged parts so they read differently with the same
   effect. If I want to go ahead with the safe alternative, draft it as a fresh
   change to `requirement.md` that drops the flagged parts, and go back to the

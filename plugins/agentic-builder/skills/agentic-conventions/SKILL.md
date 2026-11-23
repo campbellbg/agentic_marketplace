@@ -1,6 +1,6 @@
 ---
 name: agentic-conventions
-description: Shared conventions of the agentic-builder plugin - project settings and their defaults, fixed AWS access, how to find what a feature changed, the feature directory and its files (including the requirement template), the review report protocol (round numbers, Summary line, verdict and severity rules) and the rules every test follows. Preloaded into the agentic-builder agents; load it whenever you work on the agentic-requirement or agentic-build commands, their agents or their files outside them.
+description: Shared conventions of the agentic-builder plugin - project settings and their defaults, the environment bounds every solution must fit, fixed AWS access, how to find what a feature changed, the feature directory and its files (including the requirement template), the review report protocol (round numbers, Summary line, verdict and severity rules) and the rules every test follows. Preloaded into the agentic-builder agents; load it whenever you work on the agentic-requirement or agentic-build commands, their agents or their files outside them.
 user-invocable: false
 ---
 
@@ -23,8 +23,8 @@ not set. The `agentic-build-environment` skill writes the section.
 | Source and test dirs | Work them out from the repo layout (e.g. `src/`, `test/`, `tests/`) |
 | Technology stack | Work it out from the repo: manifests and source |
 | Deployment | All deployments except secrets run through GitHub Actions workflows; never deploy from a local machine. AWS resources are deployed with CloudFormation. |
-| Hosting pattern | `None`. When set (e.g. `app-serving`), load the `deploy-environments` skill and follow it for production and per-PR preview environments. |
-| Production environment name (`<env>`) | `None`. Required when Hosting pattern is set; the base of every resource name. |
+| Hosting pattern | **Required, no default.** One of the patterns the `deploy-environments` skill lists (currently only `app-serving`). Load that skill and follow it for production and per-PR preview environments. |
+| Production environment name (`<env>`) | **Required, no default.** The base of every resource name. |
 | Secrets | Created manually, never by CI. The scripts that create or update them live in a git-ignored `secrets/` directory; templates and workflows reference secrets by name or ARN only, never by value. |
 | Git remote (`<remote>`) | `origin`, or the only remote if there is just one. If neither applies, stop and say so. |
 | Base branch (`<base-branch>`) | The remote's default branch (`git symbolic-ref --short refs/remotes/<remote>/HEAD`, minus the `<remote>/` prefix); if the remote has none, `main`. |
@@ -38,6 +38,39 @@ section; work them out each time. If `CLAUDE.md` states one elsewhere (e.g. a
 - **Test command:** the project's standard test command, from its manifest or
   build files (e.g. `npm test`, `pytest`, `go test ./...`).
 - **Test conventions:** the patterns the existing tests follow.
+
+If Hosting pattern or Production environment name is missing, or Hosting pattern
+names a pattern that `deploy-environments` does not list, the environment is not
+set up: do not guess one. Commands stop and point the user at the
+`agentic-build-environment` skill; agents return `Blocked: ...`.
+
+## Environment bounds
+
+Every solution must fit the project's build environment as it is set up now.
+These are the bounds:
+
+- **Hosting pattern:** only what the pattern's reference in `deploy-environments`
+  lists under Bounds. Its template is the only infrastructure, changed only
+  where the reference says it may be adapted.
+- **Technology stack:** the languages, frameworks and runtimes in the Technology
+  stack setting. New libraries within that stack are fine; a new language,
+  runtime or framework is not.
+- **Deployment and AWS access:** the pattern's workflows and the one deploy role
+  in `AWS_DEPLOY_ARN`, with the permissions the pattern's reference lists. No
+  other AWS service, resource or permission, and no other deploy role.
+
+The user widens the bounds on purpose, by adding a hosting pattern with its own
+deploy role and permissions, never as a side effect of a feature. So:
+
+- **Never** design, plan, build or accept a solution that steps outside the
+  bounds, even partly, and never work round them (e.g. a third-party backend in
+  place of server code, a secret baked into the client, a resource created by a
+  script instead of the template).
+- If a requirement cannot be met within the bounds, **stop and say so**: name
+  the part that does not fit and the bound it breaks. `decompose-requirement`
+  returns `NOT FIT TO BUILD`; `code-builder` returns `Blocked: ...`; a reviewer
+  reports a finding. Do not build a cut-down version unless the requirement
+  has been changed to ask for it.
 
 ## AWS access (fixed, not a setting)
 
@@ -69,6 +102,9 @@ git status --porcelain -uall     # plus new, untracked files
 |------|-----------|-------|
 | `requirement.md` | the user, or drafted from their description by the `agentic-requirement` command | What was asked for. Only the user, or `agentic-requirement` with the user's explicit approval, changes it; no agent ever edits it. Format: [assets/requirement-template.md](assets/requirement-template.md). |
 | `requirement-decomposed.md` | `decompose-requirement` only, run by `agentic-requirement` | The approved plan: a single build or iterations, each with its acceptance criteria, Tests table and Definition of Done. The build's input. One file with no round number, replaced in full each time the requirement is re-reviewed. |
+| `build_<NNN>.md` | `code-builder` | Its report for the round: what changed, coverage by AC ID, and the reason for any finding it did not fix. |
+| `review_<reviewer>_<NNN>.md` | each review agent | `<reviewer>` is the agent name without `review-` (`review-code` -> `review_code_004.md`). |
+| `review_consolidated_<NNN>.md` | `consolidate-reviews` | The round's build directions for `code-builder`. |
 
 **Two stages.** The requirement stage (`/agentic-requirement`) is interactive:
 it writes `requirement.md`, has `decompose-requirement` review it and plan the
@@ -76,9 +112,6 @@ build, and ends when the user approves the plan. The build stage
 (`/agentic-build`) runs unattended and starts only from an approved
 `requirement-decomposed.md` whose `Source hash` matches `requirement.md`. Rounds
 belong to the build stage only.
-| `build_<NNN>.md` | `code-builder` | Its report for the round: what changed, coverage by AC ID, and the reason for any finding it did not fix. |
-| `review_<reviewer>_<NNN>.md` | each review agent | `<reviewer>` is the agent name without `review-` (`review-code` -> `review_code_004.md`). |
-| `review_consolidated_<NNN>.md` | `consolidate-reviews` | The round's build directions for `code-builder`. |
 
 **Rounds.** `<NNN>` is the round: one run of `code-builder`, then every review
 agent, then `consolidate-reviews`, numbered from `001`, zero-padded to three
@@ -203,7 +236,7 @@ stops and asks the user.
   starting `CI only: <dependency>` or `Local only: <reason>`. Use it only where
   the iteration's Tests table plans it, or where a test truly cannot run in one
   environment. Never skip a test because it fails or is awkward.
-- **Hosting pattern set:** a test of the deployed site takes its base URL from
+- **Deployed-site tests:** a test of the deployed site takes its base URL from
   `PREVIEW_URL` and uses the CI-only skip form when it is unset.
 - **Running the suite:** run the check command, if there is one, then the whole
   suite with the test command, without `PREVIEW_URL` or cloud credentials, so

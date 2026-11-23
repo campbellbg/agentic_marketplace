@@ -3,6 +3,30 @@
 A single-page app (static build output) served from a private S3 bucket through
 CloudFront. No server-side code; anything that needs one is a different pattern.
 
+## Bounds
+
+What a project on this pattern can and cannot have (see Environment bounds in
+the `agentic-conventions` skill).
+
+**Within bounds:**
+- A client-side app, built to static files and served from the bucket.
+- Data and state kept in the browser (e.g. memory, `localStorage`, IndexedDB).
+- Static files shipped with the build (e.g. JSON content, images).
+- Calls from the browser to an existing public API that needs no secret, with
+  its origin added to the CSP `connect-src`.
+
+**Out of bounds:**
+- Any server-side code: an API, Lambda, Lambda@Edge, server-side rendering, or
+  CloudFront Function logic beyond the routing function.
+- Any data stored outside the browser: a database, user uploads, or writes to
+  the bucket from the app.
+- Sign-in or user accounts that need a backend or an identity service (e.g.
+  Cognito).
+- Any secret the app needs at runtime. Everything in the build is public.
+- Any AWS resource the template does not have, or any change to it beyond what
+  Files and placeholders allows. That includes custom domains and certificates.
+- Any deploy-role permission beyond Deploy role permissions below.
+
 ## Resources
 
 One CloudFormation template, `infra/app-serving.cfn.yaml`, deployed twice with

@@ -19,8 +19,8 @@ the base branch.** Always check the current branch first with
 Read the Requirements dir, Git remote, Base branch, Hosting pattern and Secrets
 settings as the `agentic-conventions` skill describes (load it), with its
 defaults. Work them out once at the start and tell the user which you used.
-When Hosting pattern is set, PRs get a preview environment and merges deploy
-production (see the `deploy-environments` skill).
+PRs get a preview environment and merges deploy production (see the
+`deploy-environments` skill).
 
 ## Deriving names and messages
 
@@ -178,7 +178,7 @@ a merge, stop and show the error. Do not try to get round the rules.
   git branch -D <branch>   # if --delete-branch did not already remove it
   ```
   Confirm the merge, and that the remote and local branches are gone.
-- **Hosting pattern set:** the PR's checks include deploying and testing its
+- **Preview and production:** the PR's checks include deploying and testing its
   preview, so a green PR has been proved on the preview. Report the preview URL
   (the `Preview:` PR comment, or the deploy job's summary). After the merge,
   find the runs it triggered on `<base-branch>` and the closed PR:
@@ -197,8 +197,7 @@ the user says "ship <feat>". Run action 2 (commit and push), action 3 (PR), then
 action 4 (merge on green). Report:
 - the branch, commit subject and PR URL;
 - the check results and merge result;
-- if the project has a Hosting pattern, the preview URL, production deploy and
-  preview teardown results.
+- the preview URL, production deploy and preview teardown results.
 
 ## Edge cases
 
@@ -212,8 +211,8 @@ action 4 (merge on green). Report:
   force-pushing. Never use `--force` or `--no-verify`.
 - **`git pull --ff-only` fails on `<base-branch>`**: stop and tell the user. Do
   not merge or rebase to make it fit.
-- **Deployments run in CI.** Opening or updating a PR deploys its preview (if the
-  project has a Hosting pattern); merging deploys production. Never deploy, run
+- **Deployments run in CI.** Opening or updating a PR deploys its preview; merging
+  deploys production. Never deploy, run
   a secrets script, or change AWS resources to make a check pass. A failing
   deploy check is reported like any other failure.
 - **Merge conflicts on the PR** (`gh pr view <number> --json mergeable`

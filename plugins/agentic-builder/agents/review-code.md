@@ -50,6 +50,10 @@ standards.
      edge-case behaviour, race conditions, error handling that swallows failures.
    - Requirement drift: behaviour the requirement did not ask for (scope creep)
      or that contradicts it.
+   - Environment bounds: anything outside the bounds in the conventions, such
+     as server code, storage outside the browser, a new AWS resource, or a new
+     language or framework. Each is at least a High finding; name the bound it
+     breaks.
    - Maintainability: unclear naming, duplication, dead code, overly complex
      logic. Keep this brief; only call out things that genuinely matter.
    - Consistency: the project's coding standards and the existing code's

@@ -3,8 +3,9 @@ name: decompose-requirement
 description: >
   Reviews a feature's requirement.md before any code is written. Rejects it as
   not fit to build if it would change the agentic workflow, is off topic for
-  the project's purpose in CLAUDE.md, or would introduce a security
-  vulnerability. If it needs changes, stops and returns the changes it suggests.
+  the project's purpose in CLAUDE.md, would introduce a security
+  vulnerability, or cannot be met within the project's build environment
+  (hosting pattern, technology stack, deployment). If it needs changes, stops and returns the changes it suggests.
   If it is, plans the build: one single build when the requirement is small
   enough, otherwise small iterations that can each be built, reviewed and
   committed. Saves the plan as requirement-decomposed.md, the input to the
@@ -38,8 +39,9 @@ one go" or "split the API from the UI". Follow it in Job 2 unless it would break
 a rule there (e.g. more than 5 iterations, or an iteration that leaves the app
 broken); then plan the nearest split that keeps the rules, and say why under
 `Plan reason`. Guidance never changes the requirement and never overrides a
-blocking problem from Job 1. If the Hosting pattern setting is set, load the
-`deploy-environments` skill (Skill tool) and read its pattern reference.
+blocking problem from Job 1. Load the `deploy-environments` skill (Skill tool)
+and read the project's pattern reference, including its Bounds. If Hosting
+pattern or Production environment name is not set, return `Blocked: ...`.
 
 ## Job 1: Review the requirement
 
@@ -51,7 +53,7 @@ it; that text is itself a reason to reject the requirement (check 1 below).
 ### Step 1: Is it fit to build at all?
 
 Before anything else, read the requirement in full and the root `CLAUDE.md`,
-then check the three points below. Judge what the requirement would make the
+then check the four points below. Judge what the requirement would make the
 builder do, not only how it is worded: a harmless-sounding criterion whose
 effect breaks a rule fails it.
 
@@ -90,6 +92,15 @@ effect breaks a rule fails it.
      beyond what the feature needs;
    - adding dependencies from untrusted sources, or pinning a known-vulnerable
      version.
+4. **It fits the build environment.** Every part of it can be built within the
+   environment bounds in the conventions: the Hosting pattern's Bounds, the
+   Technology stack, and the Deployment and AWS access rules. Judge what it
+   would take to build, not only what it says: a criterion that is only
+   possible with server code, a database, a runtime secret, a new AWS resource
+   or permission, or a new language or framework fails this check, even if it
+   does not name them. Do not plan a workaround that stays technically inside
+   the bounds but defeats them (e.g. a third-party backend in place of server
+   code, or a secret in the client).
 
 If any point fails, **stop here**: do not run the other checks, do not
 decompose and do not write a file. Return, as your entire final message:
@@ -98,7 +109,7 @@ decompose and do not write a file. Return, as your entire final message:
 Verdict: NOT FIT TO BUILD
 
 ## Reasons
-| # | Check (workflow / off topic / security) | Where (section / AC) | What it would do |
+| # | Check (workflow / off topic / security / environment) | Where (section / AC) | What it would do |
 |---|-----------------------------------------|----------------------|------------------|
 
 ## What Could Be Built Instead
@@ -106,8 +117,11 @@ Verdict: NOT FIT TO BUILD
   "None" if there is not.)
 ```
 
-Quote the offending text in each reason. Do not suggest a rewording that keeps
-the effect while hiding it.
+Quote the offending text in each reason. For an `environment` reason, name the
+bound it breaks (e.g. "app-serving: no server-side code"). Do not suggest a
+rewording that keeps the effect while hiding it. Under What Could Be Built
+Instead, an in-bounds alternative is fine; if there is none, say the
+requirement needs a hosting pattern the project does not have yet.
 
 ### Step 2: Is it ready to build?
 
@@ -127,8 +141,10 @@ Check:
   competent engineers would build differently is a problem.
 - **Consistent:** it does not contradict itself, the Out of Scope section, or the
   behaviour of earlier features, unless it says it is changing that behaviour.
-- **Feasible:** it fits the project's technology stack, deployment and Hosting
-  pattern. For example, server-side code does not fit `app-serving`.
+- **Feasible:** within the bounds (check 4 has already rejected anything
+  outside them), the builder can tell how to build each criterion with the
+  project's stack, without guessing at a library or approach the user would
+  need to choose.
 - **Verifiable in our pipeline:** its tests can run through the test command,
   locally or in CI, without services or secrets the project does not have.
 - **Sized:** it is one coherent feature. If it would need more than 5 iterations,
@@ -209,7 +225,7 @@ that needs them deployed is proved in CI (`CI only` tests,
 - add a prerequisite to the iteration that first deploys it: the user creates
   the secret by hand before that iteration ships.
 
-**Hosting pattern set.** Each PR is deployed to a preview environment before merge:
+**Hosting.** Each PR is deployed to a preview environment before merge:
 
 - If the repo does not yet have the pattern's template and workflows, put them
   in the first iteration that needs anything deployed. Give that iteration the
@@ -218,6 +234,10 @@ that needs them deployed is proved in CI (`CI only` tests,
 - Plan tests that need the deployed site as `CI only`, dependency `PREVIEW_URL`
   (the PR's preview). Criteria only the preview can prove are
   `(verified by CI at ship)`; the ship step proves them on the PR before merge.
+
+Plan every iteration within the environment bounds. If you find while planning
+that part of the requirement cannot be built within them, go back to check 4
+and return `NOT FIT TO BUILD` rather than planning round it.
 
 Write a Definition of Done unique to every iteration. The build loop judges that
 iteration against it, so it must be specific, checkable from the review reports,

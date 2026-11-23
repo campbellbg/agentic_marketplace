@@ -22,6 +22,10 @@ command that would fix it, and build nothing. Do not fix these yourself.
    older `## Agentic build` section), tell me, then use the
    `agentic-build-environment` skill to set it up with me. Re-read `CLAUDE.md`
    when it is written. If I decline, or the section is still missing, stop.
+   The section must also set Hosting pattern to a pattern the
+   `deploy-environments` skill lists, and Production environment name. If
+   either is missing or `None`, stop and suggest the `agentic-build-environment`
+   skill to set them.
    The skill leaves `CLAUDE.md` and `.gitignore` uncommitted; step 0 carries
    them onto the feature branch, with this feature's requirement files. Other
    features' uncommitted requirement drafts stay behind, uncommitted.
@@ -122,7 +126,7 @@ Use the `gitprocess` skill for all branch, commit, push, PR and merge work.
    - each iteration and its number of rounds;
    - any warnings;
    - the ship result, including the preview URL, production deploy and preview
-     teardown when the project has a Hosting pattern;
+     teardown;
    - any one-time prerequisites I need to do, from the Prerequisites for the
      User section of every `build_<NNN>.md` of this feature;
    - any finding still listed under Conflicts in the last consolidated review.
@@ -131,5 +135,11 @@ Use the `gitprocess` skill for all branch, commit, push, PR and merge work.
 
 - If the builder or a review agent raises an open question that changes the
   requirement, **stop and ask me** instead of guessing.
+- If the builder returns `Blocked:` because the iteration cannot be met within
+  the environment bounds (see the conventions), or a review finds the code
+  outside them and the builder cannot fix it without leaving them, **stop and
+  show me** which part does not fit and which bound it breaks. Do not commit
+  it as WIP. The requirement needs changing, or I need to add a hosting
+  pattern first.
 - Otherwise, stop only at the points named in pre-flight and in steps 1b, 1g
   and 2.
