@@ -1,5 +1,5 @@
 ---
-description: Run the agentic build loop for a feature whose requirement /agentic-requirement has approved - build, review and commit each iteration on a feature branch, then open the PR and merge on green CI. Use when the user says "build feat_NNNN", "implement feat_NNNN", "start the build", "run the agentic build", "kick off the build loop", or asks to build or implement an approved requirement. Takes the feature name; with none, lists the features and asks which to build.
+description: Run the agentic build loop for a feature whose requirement /agentic-requirement has approved - build, review and commit each iteration in the feature's own git worktree, then open the PR and merge on green CI under a local merge lock. Several builds can run at once, in separate terminals or headless. Use when the user says "build feat_NNNN", "implement feat_NNNN", "start the build", "run the agentic build", "kick off the build loop", or asks to build or implement an approved requirement. Takes the feature name; with none, lists the features and asks which to build.
 argument-hint: <feature name, e.g. feat_0002>
 ---
 
@@ -16,7 +16,9 @@ command that would fix it, and build nothing. Do not fix these yourself.
 
 1. **Repository.** `git rev-parse --show-toplevel` succeeds (otherwise stop:
    suggest `git init`), and `gh auth status` succeeds (otherwise stop: suggest
-   `! gh auth login`).
+   `! gh auth login`). Start from the main checkout (the first entry of
+   `git worktree list`) or from this feature's own worktree. If the session is
+   in any other worktree, stop and say which one.
 2. **Build environment.** The root `CLAUDE.md` has a `## Agentic build
    environment` section. If it does not (no `CLAUDE.md`, no section, or only an
    older `## Agentic build` section), tell me, then use the
@@ -26,9 +28,17 @@ command that would fix it, and build nothing. Do not fix these yourself.
    `deploy-environments` skill lists, and Production environment name. If
    either is missing or `None`, stop and suggest the `agentic-build-environment`
    skill to set them.
-   The skill leaves `CLAUDE.md` and `.gitignore` uncommitted; step 0 carries
-   them onto the feature branch, with this feature's requirement files. Other
-   features' uncommitted requirement drafts stay behind, uncommitted.
+   - **`CLAUDE.md` must be committed** in the main checkout
+     (`git status --porcelain -- CLAUDE.md` is empty), because the feature's
+     worktree starts from `<remote>/<base-branch>`. If it is not, tell me and
+     ask whether to ship it now as a `chore-agentic-environment` PR with
+     `gitprocess` (action 5, carrying `CLAUDE.md` and, if it has changes,
+     `.gitignore`). On yes, ship it, then carry on from the updated base
+     branch. On no, or if no one can answer (a headless run), stop.
+   - **`.claude/worktrees/` must be git-ignored**
+     (`git check-ignore -q .claude/worktrees/`). If it is not, stop and suggest
+     adding it to `.gitignore` and committing it (or include it in the chore PR
+     above).
 3. **Remote and base branch.** Read the settings as the conventions describe.
    The Git remote exists (`git remote`), otherwise stop (e.g.
    `gh repo create --source . --private --push`). The base branch exists on it
@@ -92,8 +102,10 @@ Use the `gitprocess` skill for all branch, commit, push, PR and merge work.
 
 ## Build loop
 
-0. **Branch.** Use `gitprocess` to create (or switch to) the feature branch for
-   `<feat>` from an up-to-date base branch.
+0. **Worktree.** Use `gitprocess` action 1 to create (or reuse) the feature's
+   worktree and enter it. It moves this feature's requirement files out of the
+   main checkout into the worktree; other features' drafts stay behind. Every
+   step below, and every agent, runs in the worktree.
 
 1. **For each iteration** in `requirement-decomposed.md`, in order. Skip any
    iteration that already has a non-WIP `<feat>: iteration <k>/<n>` commit on
@@ -119,8 +131,13 @@ Use the `gitprocess` skill for all branch, commit, push, PR and merge work.
       open, and do not start the next iteration.
 
 2. **Ship.** After the last iteration, use `gitprocess` to ship the feature:
-   open the PR, wait for its CI checks, and merge if they are green. If a check
-   fails, do not merge: report the failure and leave the PR open.
+   open the PR, wait for its CI checks, take the merge lock, re-run CI if
+   another feature merged in the meantime, and merge if green. If a check
+   fails, do not merge: report the failure and leave the PR open. After a merge,
+   `gitprocess` returns the session to the main checkout and removes the
+   worktree. If the build stops anywhere else (WIP, red CI, a question for me),
+   the worktree stays: report its path. Running `/agentic-build <feat>` again
+   picks it up.
 
 3. **Summarise** for me:
    - each iteration and its number of rounds;

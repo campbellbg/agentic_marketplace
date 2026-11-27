@@ -125,8 +125,11 @@ in backticks where they are commands or paths:
 - **No `CLAUDE.md`:** create it with a `# <project name>` heading and the section.
 
 If Secrets uses a `secrets/` directory that `.gitignore` does not cover, add
-`secrets/` to `.gitignore` and say so.
+`secrets/` to `.gitignore` and say so. If `.gitignore` does not cover
+`.claude/worktrees/` (`git check-ignore -q .claude/worktrees/`), add it too:
+builds run in worktrees there.
 
-Do not commit the change. The build loop carries `CLAUDE.md` and `.gitignore`
-onto the feature branch and commits them with the feature; otherwise the user or
-the gitprocess skill commits them. Report the path you wrote.
+Do not commit the change. Builds start from the committed base branch, so
+`CLAUDE.md` and `.gitignore` must be committed before the next build: the user
+commits them, or `/agentic-build` offers to ship them as a
+`chore-agentic-environment` PR. Report the path you wrote and say this.

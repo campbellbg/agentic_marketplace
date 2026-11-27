@@ -39,7 +39,11 @@ can be trusted.
    - a skip not in the skip form, or a `CI only` or `local only` skip that the
      Tests table does not plan;
    - a test of the deployed site that does not take its base URL from
-     `PREVIEW_URL`, or does not skip when it is unset.
+     `PREVIEW_URL`, or does not skip when it is unset;
+   - a test setup that starts a local server on a fixed port instead of `PORT`,
+     or reuses a server already running (e.g. `reuseExistingServer: true`).
+     This is **High**: parallel builds would collide, or pass by testing another
+     build's server.
 3. **Run what can run locally.** Run the check command, if there is one, then the
    whole suite, as the conventions' test rules say. Always run the whole suite, so
    earlier features are covered too. The builder ran only a targeted run, so this
