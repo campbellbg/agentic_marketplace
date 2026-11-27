@@ -6,14 +6,19 @@
 #       0  acquired (prints TOKEN=<token>)       3  still held by someone else after --wait
 #       1  error
 #   merge-lock.sh heartbeat --token <t>   0 ok | 6 lock lost (not the owner any more)
-#   merge-lock.sh release   --token <t>   0 released (or already gone) | 6 not the owner
+#   merge-lock.sh release   --token <t>   0 released (or already gone) | 6 not the owner (someone
+#                                         broke it, normally because this PR merged; harmless)
 #   merge-lock.sh status                  prints the owner and heartbeat age, or "free"
 #   merge-lock.sh break                   removes the lock whoever owns it (for the user)
 #
 # A lock is stale, and any waiter breaks it, when its heartbeat is older than
 # AGENTIC_LOCK_STALE_SECS (default 600), its PR is merged or closed, or its
 # worktree no longer exists. Breaking is an atomic rename, so two waiters can
-# never both break it and then delete each other's fresh lock.
+# never both break the same lock. The breaker then checks that the lock it moved
+# is still the one it judged stale (same token); if the owner released and a new
+# build took the lock in between, it moves that lock back instead of breaking it.
+# In the rare case it cannot, the new owner's heartbeat reports the loss (exit 6)
+# and it stops before merging.
 set -euo pipefail
 
 STALE_SECS="${AGENTIC_LOCK_STALE_SECS:-600}"
@@ -24,9 +29,14 @@ die() { echo "merge-lock: $*" >&2; exit 1; }
 now() { date +%s; }
 field() { sed -n "s/^$1=//p" "$LOCK/owner" 2>/dev/null | head -1; }
 
+mtime() { stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null; }   # GNU, then BSD/macOS
+
 heartbeat_age() {
   local hb
-  hb=$(cat "$LOCK/heartbeat" 2>/dev/null || echo 0)
+  hb=$(cat "$LOCK/heartbeat" 2>/dev/null || true)
+  # A lock taken a moment ago may not have its heartbeat written yet: use the
+  # lock directory's own time, so it never looks stale (and gets broken) early.
+  [[ "$hb" =~ ^[0-9]+$ ]] || hb=$(mtime "$LOCK" || now)
   echo $(( $(now) - hb ))
 }
 
@@ -46,9 +56,17 @@ stale_reason() {
   return 1
 }
 
+# break_lock <reason> <token>: break the lock only if it still carries <token>,
+# the token read before it was judged stale.
 break_lock() {
-  local reason="$1" grave="$LOCK.stale.$(now).$$"
+  local reason="$1" expected="$2" grave="$LOCK.stale.$(now).$$"
   if mv "$LOCK" "$grave" 2>/dev/null; then
+    if [ "$(sed -n 's/^token=//p' "$grave/owner" 2>/dev/null | head -1)" != "$expected" ]; then
+      # A fresh lock replaced the stale one after the check: put it back.
+      if [ ! -e "$LOCK" ] && mv "$grave" "$LOCK" 2>/dev/null; then return 0; fi
+      echo "merge-lock: displaced a fresh lock and could not restore it; its owner will see exit 6" >&2
+      rm -rf "$grave"; return 0
+    fi
     echo "merge-lock: broke lock held by $(sed -n 's/^branch=//p' "$grave/owner" 2>/dev/null) (PR #$(sed -n 's/^pr=//p' "$grave/owner" 2>/dev/null)): $reason" >&2
     rm -rf "$grave"
   fi
@@ -85,11 +103,13 @@ case "$cmd" in
       # Re-entry: a resumed build of the same branch takes its own lock back.
       if [ -d "$LOCK" ] && [ "$(field branch)" = "$branch" ]; then
         now > "$LOCK/heartbeat"
-        sed -i "s/^pr=.*/pr=$pr/; s|^worktree=.*|worktree=$wt|" "$LOCK/owner"
+        sed "s/^pr=.*/pr=$pr/; s|^worktree=.*|worktree=$wt|" "$LOCK/owner" > "$LOCK/owner.$$" \
+          && mv "$LOCK/owner.$$" "$LOCK/owner"   # not sed -i: it differs on macOS
         echo "TOKEN=$(field token)"; exit 0
       fi
       try_take "$branch" "$pr" "$wt" && exit 0
-      if reason=$(stale_reason); then break_lock "$reason"; continue; fi
+      seen_token=$(field token)
+      if reason=$(stale_reason); then break_lock "$reason" "$seen_token"; continue; fi
       if [ "$(now)" -ge "$deadline" ]; then
         echo "merge-lock: still held by $(field branch) (PR #$(field pr)), heartbeat $(heartbeat_age)s ago" >&2
         exit 3
@@ -116,6 +136,6 @@ case "$cmd" in
       echo free
     fi ;;
   break)
-    [ -d "$LOCK" ] && break_lock "broken by hand" || echo free ;;
+    [ -d "$LOCK" ] && break_lock "broken by hand" "$(field token)" || echo free ;;
   *) die "usage: merge-lock.sh acquire|heartbeat|release|status|break [...]" ;;
 esac

@@ -104,6 +104,16 @@ The feature directory and its round files live in the worktree until the
 feature merges. The main checkout stays on the base branch and is never built
 in.
 
+**Build-stage agents** (`code-builder`, every `review-*` agent and
+`consolidate-reviews`) check where they are before anything else. The caller
+passes the worktree path. If `git rev-parse --show-toplevel` is not that path
+(or, with no path given, is not under `.claude/worktrees/`), `cd` to the given
+path in Bash, check again, and use absolute paths under it for every file you
+read or write. If you are still not in it, or no path was given, return
+`Blocked: not in the feature worktree (<where you are>)`. Never build, test or
+save a report in the main checkout. (`decompose-requirement` runs in the main
+checkout and skips this check.)
+
 ## The feature directory
 
 `<requirements-dir>/<feat>/`, e.g. `requirements/feat_0002/`, holds:

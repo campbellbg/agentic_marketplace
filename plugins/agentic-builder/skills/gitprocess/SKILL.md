@@ -122,9 +122,14 @@ mixed to describe in one subject line.
   - Exit `5`: a path to move has changes in both places. Stop and tell the
     user; do not choose for them.
   - Any other failure: stop and show the error.
-- **Enter it** with the EnterWorktree tool, `path: <WORKTREE>`. From here on
-  every command, and every subagent started afterwards, works in the worktree.
-  Report its path, and which requirement files were moved.
+- **Enter it** with the EnterWorktree tool, `path: <WORKTREE>` (load it with
+  ToolSearch if it is deferred). From here on every command, and every
+  subagent started afterwards, works in the worktree. Report its path, and
+  which requirement files were moved.
+  - **No EnterWorktree** (some headless runs do not have it): `cd <WORKTREE>`
+    in Bash instead and say so. Subagents may then start in the main checkout,
+    so the build loop passes `<WORKTREE>` to every agent, and the agents move
+    into it themselves (see the conventions' Worktrees section).
 
 ## 2. Commit and/or push
 
@@ -142,8 +147,9 @@ mixed to describe in one subject line.
   they are never staged. Otherwise:
   ```bash
   # everything except other features' requirement dirs, then this feature's dir
-  git add -A -- . ':(exclude)<requirements-dir>/feat_*'
-  git add -A -- '<requirements-dir>/<feat>/'
+  # (<req-dir> is the Requirements dir without its trailing /, e.g. requirements)
+  git add -A -- . ':(exclude)<req-dir>/feat_*'
+  git add -A -- '<req-dir>/<feat>/'
   git commit -F <message-file>     # subject, body, trailer as derived above
   git push -u <remote> <current-branch>
   ```
@@ -201,7 +207,8 @@ Exit `3` means still pending: run it again, up to 60 minutes in all for one
 commit, then stop and report the checks still pending. Exit `0`: all passed, go
 to b. Exit `2`: go to **Red**. Exit `4` (head moved): start a again with the new
 head. Exit `5` (no checks appeared): **stop and tell the user**; do not merge a
-PR with no checks.
+PR with no checks. Exit `1` (the script already retried `gh` itself): run it
+once more, then stop and show the error.
 
 **b. Acquire the merge lock.** In the foreground, timeout 600000 ms:
 ```bash
@@ -213,25 +220,37 @@ lock: run it again, up to 2 hours in all, then stop and report who holds it
 minutes, its PR merged or closed, or its worktree gone) and says so on stderr:
 report it. **From here on, every way out of action 4 releases the lock
 first** (`merge-lock.sh release --token <token>`): green, red, conflict,
-refusal or error.
+refusal or error. If release exits `6`, another build already broke the lock
+(normally because this PR had merged): report it, but it is not an error.
 
 **c. Is the base current?** `git fetch <remote>`, then compare
 `git rev-parse <remote>/<base-branch>` with the recorded
-`$(git rev-parse --git-dir)/agentic-ci-base` (missing counts as different).
+`$(git rev-parse --git-dir)/agentic-ci-base` (missing counts as different, e.g.
+an earlier run opened the PR).
 - **Same:** the green run tested this base. Go to d.
+- **Different, but the head already contains it**
+  (`git merge-base --is-ancestor <remote>/<base-branch> <head>` succeeds):
+  GitHub's merge of the head with this base is the head itself, so the green
+  run tested it. Record the base (as in action 3) and go to d.
 - **Different:** another merge moved `<base-branch>` after the run started.
   Record the new base (as in action 3), then have GitHub merge it into the PR
   branch: `gh pr update-branch <number>`. If it fails because of a conflict, go
-  to **Conflict**. Wait until the PR's head commit changes, then wait for CI on
-  the new head, passing `--token <token>` so the lock's heartbeat stays fresh:
+  to **Conflict**. Wait for the PR's head to move, then for CI on the new head,
+  passing `--token <token>` both times so the lock's heartbeat stays fresh
+  (foreground, timeout 600000 ms):
   ```bash
+  <scripts>/wait-pr-checks.sh --pr <number> --moved-from <head> --token <token>   # prints HEAD=<new-head>
   <scripts>/wait-pr-checks.sh --pr <number> --sha <new-head> --since <epoch> --token <token>
   ```
-  Same exit codes as in a, plus `6`: the lock was lost (another build broke it
-  as stale). Stop and report; do not merge. Green: go back to c.
+  For `--moved-from`, exit `3` means the head has not moved yet: run it again,
+  up to 10 minutes in all, then stop and report. Both share the exit codes in
+  a, plus `6`: the lock was lost (another build broke it as stale). Stop and
+  report; do not merge. Green: take the new head as `<head>` and go back to c.
 
-**d. Merge.**
+**d. Merge.** First confirm the lock is still yours; if this exits `6`, another
+build broke it: stop and report, do not merge.
 ```bash
+<scripts>/merge-lock.sh heartbeat --token <token>
 gh pr merge <number> --squash --match-head-commit <head>
 git push <remote> --delete <branch>
 ```
@@ -243,9 +262,10 @@ If that fails, report it and go on: the merge stands. Then release the lock.
 
 **e. Clean up.** If this session entered the worktree with EnterWorktree,
 leave it with the ExitWorktree tool (`action: keep`), which returns the session
-to the main checkout, then remove it. If the session was started inside the
-worktree, skip the removal and tell the user the two commands to run from the
-main checkout.
+to the main checkout, then remove it. If it entered with `cd` instead (no
+EnterWorktree), `cd <main-checkout>` first, then remove it. If the session was
+started inside the worktree, skip the removal and tell the user the two
+commands to run from the main checkout.
 ```bash
 git worktree remove .claude/worktrees/<branch>
 git branch -D <branch>
@@ -298,8 +318,7 @@ action 4 (merge on green). Report:
 - **`git fetch` fails with "cannot lock ref"**: another build is fetching. Run
   it once more before treating it as an error.
 - **A lock that will not clear**: `merge-lock.sh status` shows the owner and
-  heartbeat age. Only the user runs `merge-lock.sh break`.
-- **Deployments run in CI.** Opening or updating a PR deploys its preview; merging
+  heartbeat age. Only the user runs `merge-lock.sh break`.- **Deployments run in CI.** Opening or updating a PR deploys its preview; merging
   deploys production. Never deploy, run
   a secrets script, or change AWS resources to make a check pass. A failing
   deploy check is reported like any other failure.

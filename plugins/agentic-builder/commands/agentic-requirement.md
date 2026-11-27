@@ -55,6 +55,11 @@ Look at `$ARGUMENTS`:
      feature still on an unmerged branch has no directory on this one.
 
    Zero-pad to four digits (`feat_0001` if there are none). Never reuse a number.
+   **Claim it** before writing anything, because another session may be
+   drafting at the same time: `mkdir -p <requirements-dir>`, then a plain
+   `mkdir <requirements-dir>/feat_NNNN` (no `-p`, so it fails if the directory
+   exists). If it fails, another session took that number: take the next one
+   and claim again.
 2. **Gaps.** If something essential is unclear (who uses it, what counts as
    success, an obvious boundary), ask me at most 3 short questions in one go
    before writing. Do not invent scope: anything else unclear goes in an

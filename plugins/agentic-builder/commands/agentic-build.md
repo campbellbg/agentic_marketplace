@@ -45,12 +45,20 @@ command that would fix it, and build nothing. Do not fix these yourself.
    (`git ls-remote --heads <remote> <base-branch>`), otherwise stop: the base
    branch needs an initial commit pushed before a feature branch can start from it.
 4. **Feature.** If no feature was given (`$ARGUMENTS` is empty), list the
-   directories under `<requirements-dir>/` and ask me which to build. Otherwise
-   `<requirements-dir>/$ARGUMENTS/requirement.md` must exist. If it does not,
-   stop and suggest `/agentic-requirement <description>` to create it.
+   directories under `<requirements-dir>/`, plus the features that have a build
+   worktree, and ask me which to build. If no one can answer (a headless run),
+   stop and say the feature name must be passed.
+
+   **Feature directory** (`<feature-dir>`): if `git worktree list` shows a
+   worktree at `.claude/worktrees/$ARGUMENTS-*`, the build has started before
+   and its requirement files moved there, so it is
+   `<that worktree>/<requirements-dir>/$ARGUMENTS/`. Otherwise it is
+   `<requirements-dir>/$ARGUMENTS/` in the current checkout.
+   `<feature-dir>/requirement.md` must exist. If it does not, stop and suggest
+   `/agentic-requirement <description>` to create it.
 5. **Approved plan.** The requirement stage (`/agentic-requirement`) reviews and
    plans the requirement; this loop does not. In
-   `<requirements-dir>/$ARGUMENTS/`, `requirement-decomposed.md` must exist,
+   `<feature-dir>`, `requirement-decomposed.md` must exist,
    read `Verdict: APPROVED`, and its `Source hash` must equal the hex digest
    (first field) of `sha256sum requirement.md`.
    - Missing or not approved: stop and suggest `/agentic-requirement $ARGUMENTS`.
@@ -85,8 +93,8 @@ loop never runs `decompose-requirement` and never edits either requirement file.
 - **`consolidate-reviews`** turns a round's reports into build directions and
   judges the iteration's Definition of Done.
 
-Pass each agent only `<feat>`, the iteration and the round. They read their own
-settings.
+Pass each agent only `<feat>`, the iteration, the round and the worktree path
+(the `WORKTREE` from step 0). They read their own settings.
 
 **Round** (`<NNN>`): before each `code-builder` run, take one more than the
 highest `<NNN>` of any round file in `<requirements-dir>/<feat>/`
@@ -126,9 +134,12 @@ Use the `gitprocess` skill for all branch, commit, push, PR and merge work.
       start the next iteration.
    f. **Not met:** go back to step a for the same iteration. The builder reads
       the latest directions and reworks.
-   g. **Stop after 3 build rounds** on one iteration even if it is not met.
-      Commit and push it as WIP with `gitprocess` (no PR), report what is still
-      open, and do not start the next iteration.
+   g. **Stop after 3 build rounds** on one iteration **in this run** even if it
+      is not met. Only rounds started by this run count: rounds from an earlier
+      run (e.g. one that stopped with a WIP commit) do not, so a resumed
+      iteration gets 3 fresh rounds and the builder starts from the latest
+      consolidated directions. Commit and push it as WIP with `gitprocess` (no
+      PR), report what is still open, and do not start the next iteration.
 
 2. **Ship.** After the last iteration, use `gitprocess` to ship the feature:
    open the PR, wait for its CI checks, take the merge lock, re-run CI if
