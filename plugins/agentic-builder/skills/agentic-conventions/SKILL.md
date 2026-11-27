@@ -88,11 +88,21 @@ yourself.
 Everything on the feature branch since it left the base branch, committed or not:
 
 ```bash
-base=$(git merge-base <base-branch> HEAD)
+base=$(git merge-base <remote>/<base-branch> HEAD)   # the remote's, not the local branch: builds never update it
 git diff --stat "$base"          # committed and uncommitted changes to tracked files
 git diff "$base" -- <path>       # one file's change
 git status --porcelain -uall     # plus new, untracked files
 ```
+
+## Worktrees
+
+Each build runs in its own git worktree, `.claude/worktrees/<branch>` under
+the main checkout, so several builds can run at once (see the `gitprocess`
+skill). The session and every agent work inside it, so `git rev-parse
+--show-toplevel` is the worktree, and `CLAUDE.md` there is the committed copy.
+The feature directory and its round files live in the worktree until the
+feature merges. The main checkout stays on the base branch and is never built
+in.
 
 ## The feature directory
 
@@ -242,10 +252,23 @@ stops and asks the user.
 - **Running the suite:** run the check command, if there is one, then the whole
   suite with the test command, without `PREVIEW_URL` or cloud credentials, so
   nothing touches a deployed environment. Give it a Bash timeout of 600000 ms; a
-  run cut off by your own timeout is not a test result. If the runner starts its
-  own server, first check that nothing already listens on its port
-  (`ss -ltn`). If something does, the run could test a stale server, so report
-  it rather than stopping that process.
+  run cut off by your own timeout is not a test result.
+- **Local server port.** Other builds may be running their tests in other
+  worktrees at the same moment, so a runner that starts its own server must not
+  assume its port is free:
+  - The test config reads the port from `PORT`, defaulting to the project's
+    usual port, and uses it for both the server and the tests' base URL. It
+    never reuses a server that is already running (e.g. Playwright
+    `reuseExistingServer: false`): a reused server may be another build's, so
+    the tests would check the wrong code and still pass.
+  - Before each run, pick a port with this skill's `scripts/free-port.sh
+    <usual-port>` (the first free port from there upward) and run with
+    `PORT=<port>`.
+  - If the server still fails to start because the port is taken
+    (`EADDRINUSE`, "address already in use"), another run took it in the
+    meantime: pick again with `free-port.sh <usual-port> --after <port>` and
+    re-run once. That retry is not a flaky test. Never stop another process
+    to free a port.
 - **Who runs what:** review-tester runs the whole suite every round; its run is
   the gate that proves the whole suite passes. code-builder runs only a
   **targeted run**: the check command, if there is one, then just this
@@ -253,7 +276,7 @@ stops and asks the user.
   changed, selected with the runner's filter or file arguments (e.g.
   `npx playwright test <files>`, `pytest <files> -k <name>`,
   `npx vitest run <files>`). It follows the rest of these rules (no
-  `PREVIEW_URL`, timeout, port check). If the runner cannot select tests, it runs
+  `PREVIEW_URL`, timeout, local server port). If the runner cannot select tests, it runs
   the whole suite instead.
 - Test output directories (e.g. `test-results/`, `playwright-report/`,
   `coverage/`) belong in `.gitignore`, because iteration commits stage

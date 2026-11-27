@@ -34,8 +34,13 @@ the `agentic-build-environment` skill. If I decline, stop.
 Look at `$ARGUMENTS`:
 
 - **Empty:** ask me to describe the feature.
-- **A feature name** (`feat_` followed by four digits) whose directory exists
-  under `<requirements-dir>/`: **revise** it. Skip to step 4. If I also gave
+- **A feature name** (`feat_` followed by four digits) with a build worktree
+  (`git worktree list` shows `.claude/worktrees/<feat>-*`): **stop**. Its
+  requirement moved into that worktree when the build started. Tell me the
+  path, and that changing it part-way through a build stops `/agentic-build`
+  and asks me what to do.
+- **A feature name** whose directory exists under `<requirements-dir>/`:
+  **revise** it. Skip to step 4. If I also gave
   text after the name, treat it as the changes I want and draft them as in
   step 3, editing the existing `requirement.md`.
 - **A path to a readable file:** read it; its contents are the description. If
@@ -115,8 +120,8 @@ time the agent runs, so no older versions are kept beside it.
 Tell me:
 
 - the paths of `requirement.md` and `requirement-decomposed.md`;
-- that both stay uncommitted on the current branch, and that `/agentic-build`
-  carries them onto the feature branch and commits them with the feature;
+- that both stay uncommitted in this checkout, and that `/agentic-build` moves
+  them into the feature's worktree and commits them with the feature;
 - the next step: `/agentic-build <feat>`.
 
 If the feature already has a branch with iteration commits

@@ -77,7 +77,10 @@ covers. Use it to choose a mode:
    the conventions' test rules. In Rework mode, add a test for any bug you fix
    where one is practical. If a test needs a new tool or setup step in CI, add it
    to every CI workflow that runs the tests and say so in your report. Do not add
-   secrets or cloud resources for a test; raise it as an open question.
+   secrets or cloud resources for a test; raise it as an open question. If the
+   test setup starts a local server and does not yet read its port from `PORT`
+   or still reuses a running server, fix that as the conventions' local server
+   port rule says, whenever you touch the test setup.
 6. **Verify.** Do a targeted run as the conventions' test rules say: the check
    command, then only this iteration's planned tests and the tests in files you
    created or changed. Do not run the whole suite; review-tester runs it next as
