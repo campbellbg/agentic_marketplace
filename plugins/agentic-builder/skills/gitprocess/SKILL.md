@@ -318,7 +318,8 @@ action 4 (merge on green). Report:
 - **`git fetch` fails with "cannot lock ref"**: another build is fetching. Run
   it once more before treating it as an error.
 - **A lock that will not clear**: `merge-lock.sh status` shows the owner and
-  heartbeat age. Only the user runs `merge-lock.sh break`.- **Deployments run in CI.** Opening or updating a PR deploys its preview; merging
+  heartbeat age. Only the user runs `merge-lock.sh break`.
+- **Deployments run in CI.** Opening or updating a PR deploys its preview; merging
   deploys production. Never deploy, run
   a secrets script, or change AWS resources to make a check pass. A failing
   deploy check is reported like any other failure.

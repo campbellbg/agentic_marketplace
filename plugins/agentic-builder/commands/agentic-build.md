@@ -60,7 +60,8 @@ command that would fix it, and build nothing. Do not fix these yourself.
    plans the requirement; this loop does not. In
    `<feature-dir>`, `requirement-decomposed.md` must exist,
    read `Verdict: APPROVED`, and its `Source hash` must equal the hex digest
-   (first field) of `sha256sum requirement.md`.
+   (first field) of `tr -d '\r' < requirement.md | sha256sum` (carriage returns
+   stripped, so CRLF and LF checkouts hash the same).
    - Missing or not approved: stop and suggest `/agentic-requirement $ARGUMENTS`.
    - Hash differs: the requirement changed after it was approved. If the
      feature branch already has iteration commits

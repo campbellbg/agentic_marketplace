@@ -266,7 +266,7 @@ done. Only conditions that CI alone can prove may be left to the ship step, mark
 # <feature>: <Title> - Decomposed
 
 Source: <requirements-dir>/<feature>/requirement.md
-Source hash: <hex digest only: the first field of sha256sum requirement.md>
+Source hash: <hex digest only: the first field of tr -d '\r' < requirement.md | sha256sum>
 Plan: single build | iterations
 Plan reason: <one sentence>
 Iterations: <n, which is 1 for a single build>
@@ -319,6 +319,8 @@ Definition of Done below, not by this one.>
 
 The build loop compares `Source hash` with the current file to spot a requirement
 that has changed, so write the 64-character hex digest only, not the file name.
+Carriage returns are stripped before hashing, so a CRLF checkout (e.g. on
+Windows) hashes the same as an LF one.
 
 ## Save the decomposition
 
